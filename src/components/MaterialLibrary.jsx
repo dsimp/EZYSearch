@@ -138,7 +138,7 @@ export default function MaterialLibrary({ materialsList }) {
                 <span className="text-yzy-bone font-bold">{mat.lifespan}</span>
               </div>
 
-              {/* Sourcing Method Card */}
+              {/* Local Sourcing Protocol */}
               <div className="bg-yzy-black/80 p-2.5 border border-yzy-slate/60 mt-2">
                 <span className="text-[9px] text-yzy-ash uppercase font-bold block mb-1">
                   LOCAL HARVESTING PROTOCOL:
@@ -147,6 +147,24 @@ export default function MaterialLibrary({ materialsList }) {
                   {mat.sourcingMethod}
                 </p>
               </div>
+
+              {/* Exact Supplier & Order Channel */}
+              {mat.supplier && (
+                <div className="bg-yzy-charcoal/80 p-2.5 border border-yzy-slate mt-1 text-[10px] font-mono">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-yzy-neon font-bold text-[9px] uppercase tracking-wider">
+                      PRIMARY SUPPLIER ORDER SOURCE:
+                    </span>
+                    <span className="text-yzy-ash text-[9px]">{mat.supplier.location.split('/')[0]}</span>
+                  </div>
+                  <span className="font-bold text-yzy-bone text-xs block">{mat.supplier.name}</span>
+                  <span className="text-yzy-ash text-[10px] block">{mat.supplier.contact}</span>
+                  <div className="flex justify-between items-center text-[9px] pt-1.5 border-t border-yzy-slate/40 mt-1">
+                    <span className="text-yzy-chalk font-bold">PRICE: {mat.supplier.exactPrice.split('(')[0]}</span>
+                    <span className="text-yzy-ash">LEAD: {mat.supplier.leadTime}</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ))}

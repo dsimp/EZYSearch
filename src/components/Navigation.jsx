@@ -38,9 +38,10 @@ export default function Navigation({
   const navItems = [
     { id: 'builder', label: '01 // CONFIGURATOR', icon: Building2 },
     { id: 'materials', label: '02 // MATERIALS INDEX', icon: Layers },
-    { id: 'tutorials', label: '03 // NOVICE BUILD GUIDE', icon: BookOpen },
-    { id: 'sourcing', label: '04 // SOURCING RADAR', icon: Compass },
-    { id: 'benchmarks', label: '05 // COST BENCHMARKS', icon: DollarSign },
+    { id: 'furniture', label: '03 // ECO FURNITURE', icon: Cpu },
+    { id: 'tutorials', label: '04 // NOVICE BUILD GUIDE', icon: BookOpen },
+    { id: 'sourcing', label: '05 // SOURCING RADAR', icon: Compass },
+    { id: 'benchmarks', label: '06 // COST BENCHMARKS', icon: DollarSign },
   ];
 
   const handleTabSelect = (tabId) => {

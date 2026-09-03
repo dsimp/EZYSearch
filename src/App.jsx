@@ -1,11 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { INFRASTRUCTURES } from './data/infrastructures';
-import { MATERIALS, UTILITY_PACKAGES, LAYERS_META } from './data/materials';
+import { MATERIALS, UTILITY_PACKAGES } from './data/materials';
+import { ARCHETYPE_PARTS, APERTURE_MATERIALS } from './data/partCatalog';
 import Navigation from './components/Navigation';
 import ModelViewer3D from './components/ModelViewer3D';
 import InfrastructureSelector from './components/InfrastructureSelector';
-import MaterialConfigurator from './components/MaterialConfigurator';
+import InteractiveMatrixHUD from './components/InteractiveMatrixHUD';
 import MaterialLibrary from './components/MaterialLibrary';
+import FurnitureCatalog from './components/FurnitureCatalog';
 import TutorialWalkthrough from './components/TutorialWalkthrough';
 import SourcingMap from './components/SourcingMap';
 import CostBreakdownModal from './components/CostBreakdownModal';
@@ -18,129 +20,89 @@ import {
   Compass, 
   DollarSign, 
   Download, 
-  Sparkles,
-  ArrowRight,
-  TrendingUp,
-  Cpu,
+  Sparkles, 
+  Cpu, 
+  ChevronRight,
   ShieldCheck,
-  CheckCircle2
+  MousePointer
 } from 'lucide-react';
 import { playTactileClick, playSelectTone, playConfirmTone } from './utils/audio';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('builder');
   const [selectedInfra, setSelectedInfra] = useState(INFRASTRUCTURES[0]);
-  const [selectedMaterials, setSelectedMaterials] = useState(INFRASTRUCTURES[0].defaultMaterials);
-  const [activeLayer, setActiveLayer] = useState('walls');
+
+  // Initial part configuration
+  const initialParts = ARCHETYPE_PARTS[INFRASTRUCTURES[0].id] || ARCHETYPE_PARTS.yzy_mono_dome;
+  const initialPartMap = {};
+  initialParts.forEach((p) => {
+    initialPartMap[p.id] = p.defaultMaterial;
+  });
+
+  const [selectedPartMaterials, setSelectedPartMaterials] = useState(initialPartMap);
+  const [activePartId, setActivePartId] = useState(initialParts[1]?.id || initialParts[0].id);
 
   // Modals
   const [isCostModalOpen, setIsCostModalOpen] = useState(false);
   const [isBlueprintModalOpen, setIsBlueprintModalOpen] = useState(false);
   const [isVisionModalOpen, setIsVisionModalOpen] = useState(false);
 
-  // When user selects a different archetype, populate its default materials
+  // Combine standard and aperture materials
+  const allMaterials = useMemo(() => [...MATERIALS, ...APERTURE_MATERIALS], []);
+
+  // When user switches Archetype
   const handleSelectInfra = (infra) => {
     setSelectedInfra(infra);
-    setSelectedMaterials(infra.defaultMaterials);
+    const infraParts = ARCHETYPE_PARTS[infra.id] || ARCHETYPE_PARTS.yzy_mono_dome;
+    const newPartMap = {};
+    infraParts.forEach((p) => {
+      newPartMap[p.id] = p.defaultMaterial;
+    });
+    setSelectedPartMaterials(newPartMap);
+    setActivePartId(infraParts[1]?.id || infraParts[0].id);
   };
 
-  // Handle Material Selection for a specific layer
-  const handleSelectMaterial = (layerKey, materialId) => {
-    setSelectedMaterials((prev) => ({
+  // When user selects a material for an individual part
+  const handleSelectPartMaterial = (partId, materialId) => {
+    setSelectedPartMaterials((prev) => ({
       ...prev,
-      [layerKey]: materialId
+      [partId]: materialId
     }));
   };
 
-  // Calculate Real-Time Total Cost and Total Net Carbon
+  // Calculate Real-Time Total Cost and Carbon across all customized parts
   const { totalCost, totalCarbon } = useMemo(() => {
+    const infraParts = ARCHETYPE_PARTS[selectedInfra.id] || ARCHETYPE_PARTS.yzy_mono_dome;
     let costSum = 0;
     let carbonSum = 0;
 
-    // Foundation
-    const fMat = MATERIALS.find((m) => m.id === selectedMaterials.foundation);
-    const fCost = (selectedInfra.sqft * 0.8) * (fMat?.costPerSqFt || 3.5);
-    const fCarbon = (selectedInfra.sqft * 0.8) * (fMat?.carbonImpact || -4.0);
+    infraParts.forEach((part) => {
+      const matId = selectedPartMaterials[part.id] || part.defaultMaterial;
+      const mat = allMaterials.find((m) => m.id === matId);
+      const utilPkg = UTILITY_PACKAGES.find((u) => u.id === matId);
 
-    // Superstructure
-    const sMat = MATERIALS.find((m) => m.id === selectedMaterials.superstructure);
-    const sCost = (selectedInfra.sqft * 0.6) * (sMat?.costPerSqFt || 4.5);
-    const sCarbon = (selectedInfra.sqft * 0.6) * (sMat?.carbonImpact || -10.0);
+      if (utilPkg) {
+        costSum += utilPkg.cost;
+        carbonSum += utilPkg.carbonImpact;
+      } else if (mat) {
+        const cost = part.surfaceAreaSqft * mat.costPerSqFt;
+        const carbon = (part.surfaceAreaSqft * 0.1) * mat.carbonImpact;
+        costSum += cost;
+        carbonSum += carbon;
+      }
+    });
 
-    // Walls
-    const wMat = MATERIALS.find((m) => m.id === selectedMaterials.walls);
-    const wCost = (selectedInfra.sqft * 1.4) * (wMat?.costPerSqFt || 4.2);
-    const wCarbon = (selectedInfra.sqft * 1.4) * (wMat?.carbonImpact || -18.0);
-
-    // Roof
-    const rMat = MATERIALS.find((m) => m.id === selectedMaterials.roof);
-    const rCost = (selectedInfra.sqft * 1.1) * (rMat?.costPerSqFt || 3.8);
-    const rCarbon = (selectedInfra.sqft * 1.1) * (rMat?.carbonImpact || -8.0);
-
-    // Insulation
-    const iMat = MATERIALS.find((m) => m.id === selectedMaterials.insulation);
-    const iCost = (selectedInfra.sqft * 1.0) * (iMat?.costPerSqFt || 2.9);
-    const iCarbon = (selectedInfra.sqft * 1.0) * (iMat?.carbonImpact || -35.0);
-
-    // Utilities
-    const uPkg = UTILITY_PACKAGES.find((u) => u.id === selectedMaterials.utilities);
-    const uCost = uPkg?.cost || 2400;
-    const uCarbon = uPkg?.carbonImpact || -650;
-
-    costSum = fCost + sCost + wCost + rCost + iCost + uCost + 650; // +650 tooling
-    carbonSum = fCarbon + sCarbon + wCarbon + rCarbon + iCarbon + uCarbon;
+    costSum += 650; // Community tooling & press kit
 
     return {
       totalCost: Math.round(costSum),
       totalCarbon: Math.round(carbonSum)
     };
-  }, [selectedInfra, selectedMaterials]);
-
-  // Apply Quick Optimization Presets
-  const handleApplyPreset = (presetType) => {
-    playConfirmTone();
-    if (presetType === 'cheapest') {
-      setSelectedMaterials({
-        foundation: 'geopolymer_concrete',
-        superstructure: 'ceb_blocks',
-        walls: 'ceb_blocks',
-        roof: 'aircrete',
-        insulation: 'aircrete',
-        utilities: 'essential_eco_pod'
-      });
-    } else if (presetType === 'eco') {
-      setSelectedMaterials({
-        foundation: 'geopolymer_concrete',
-        superstructure: 'cross_laminated_timber',
-        walls: 'hempcrete',
-        roof: 'cross_laminated_timber',
-        insulation: 'mycelium_panels',
-        utilities: 'offgrid_solar_water'
-      });
-    } else if (presetType === 'disaster') {
-      setSelectedMaterials({
-        foundation: 'geopolymer_concrete',
-        superstructure: 'ferrocement',
-        walls: 'ceb_blocks',
-        roof: 'ferrocement',
-        insulation: 'mycelium_panels',
-        utilities: 'essential_eco_pod'
-      });
-    } else if (presetType === 'brutalist') {
-      setSelectedMaterials({
-        foundation: 'geopolymer_concrete',
-        superstructure: 'rammed_earth',
-        walls: 'rammed_earth',
-        roof: 'cross_laminated_timber',
-        insulation: 'hempcrete',
-        utilities: 'offgrid_solar_water'
-      });
-    }
-  };
+  }, [selectedInfra, selectedPartMaterials, allMaterials]);
 
   return (
     <div className="min-h-screen bg-yzy-black text-yzy-bone flex flex-col selection:bg-yzy-bone selection:text-yzy-black">
-      {/* Navigation Bar */}
+      {/* Navigation Header */}
       <Navigation
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -151,16 +113,24 @@ export default function App() {
         onOpenVisionModal={() => setIsVisionModalOpen(true)}
       />
 
-      {/* Main Content Area */}
+      {/* Main Content Viewport */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-24 flex flex-col gap-6">
         {activeTab === 'builder' && (
           <div className="flex flex-col gap-6">
-            {/* Hero Architectural 3D CAD Canvas Viewport */}
+            {/* Step 1: Archetype Selection */}
+            <InfrastructureSelector
+              infrastructures={INFRASTRUCTURES}
+              selectedInfra={selectedInfra}
+              onSelectInfra={handleSelectInfra}
+            />
+
+            {/* Step 2: 3D Pick & Pull Interactive Canvas Viewport */}
             <div className="flex flex-col gap-2">
               <ModelViewer3D
                 infrastructure={selectedInfra}
-                selectedMaterials={selectedMaterials}
-                activeLayer={activeLayer}
+                selectedPartMaterials={selectedPartMaterials}
+                activePartId={activePartId}
+                onSelectPart={(partId) => setActivePartId(partId)}
                 materialsList={MATERIALS}
               />
               
@@ -168,11 +138,11 @@ export default function App() {
               <div className="bg-yzy-obsidian border border-yzy-slate/60 p-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono">
                 <div>
                   <span className="text-yzy-ash text-[9px] uppercase block">ACTIVE MODEL</span>
-                  <span className="font-bold text-yzy-bone">{selectedInfra.name}</span>
+                  <span className="font-bold text-white">{selectedInfra.name}</span>
                 </div>
                 <div>
                   <span className="text-yzy-ash text-[9px] uppercase block">FOOTPRINT</span>
-                  <span className="font-bold text-yzy-bone">{selectedInfra.sqft} SQ FT</span>
+                  <span className="font-bold text-white">{selectedInfra.sqft} SQ FT</span>
                 </div>
                 <div>
                   <span className="text-yzy-ash text-[9px] uppercase block">LIVE ESTIMATED COST</span>
@@ -185,28 +155,24 @@ export default function App() {
               </div>
             </div>
 
-            {/* Step 1: Archetype Matrix Selection */}
-            <InfrastructureSelector
-              infrastructures={INFRASTRUCTURES}
-              selectedInfra={selectedInfra}
-              onSelectInfra={handleSelectInfra}
-            />
-
-            {/* Step 2: Layer & Material Configurator */}
-            <MaterialConfigurator
-              selectedMaterials={selectedMaterials}
-              onSelectMaterial={handleSelectMaterial}
-              activeLayer={activeLayer}
-              setActiveLayer={setActiveLayer}
-              materialsList={MATERIALS}
-              onApplyPreset={handleApplyPreset}
+            {/* Step 3: Interactive Infrastructure Matrix (Pick & Pull Part Customizer + Pros & Cons) */}
+            <InteractiveMatrixHUD
               infrastructure={selectedInfra}
+              selectedPartMaterials={selectedPartMaterials}
+              onSelectPartMaterial={handleSelectPartMaterial}
+              activePartId={activePartId}
+              setActivePartId={setActivePartId}
+              materialsList={MATERIALS}
             />
           </div>
         )}
 
         {activeTab === 'materials' && (
           <MaterialLibrary materialsList={MATERIALS} />
+        )}
+
+        {activeTab === 'furniture' && (
+          <FurnitureCatalog />
         )}
 
         {activeTab === 'tutorials' && (
@@ -231,12 +197,12 @@ export default function App() {
             playTactileClick();
             setActiveTab('builder');
           }}
-          className={`flex flex-col items-center gap-1 py-1 px-2 ${
-            activeTab === 'builder' ? 'text-yzy-bone font-bold' : 'text-yzy-ash'
+          className={`flex flex-col items-center gap-1 py-1 px-1.5 ${
+            activeTab === 'builder' ? 'text-white font-bold' : 'text-yzy-ash'
           }`}
         >
           <Building2 className="w-4 h-4" />
-          <span>CONFIG</span>
+          <span>MATRIX</span>
         </button>
 
         <button
@@ -244,8 +210,8 @@ export default function App() {
             playTactileClick();
             setActiveTab('materials');
           }}
-          className={`flex flex-col items-center gap-1 py-1 px-2 ${
-            activeTab === 'materials' ? 'text-yzy-bone font-bold' : 'text-yzy-ash'
+          className={`flex flex-col items-center gap-1 py-1 px-1.5 ${
+            activeTab === 'materials' ? 'text-white font-bold' : 'text-yzy-ash'
           }`}
         >
           <Layers className="w-4 h-4" />
@@ -255,10 +221,23 @@ export default function App() {
         <button
           onClick={() => {
             playTactileClick();
+            setActiveTab('furniture');
+          }}
+          className={`flex flex-col items-center gap-1 py-1 px-1.5 ${
+            activeTab === 'furniture' ? 'text-white font-bold' : 'text-yzy-ash'
+          }`}
+        >
+          <Cpu className="w-4 h-4" />
+          <span>FURNITURE</span>
+        </button>
+
+        <button
+          onClick={() => {
+            playTactileClick();
             setActiveTab('tutorials');
           }}
-          className={`flex flex-col items-center gap-1 py-1 px-2 ${
-            activeTab === 'tutorials' ? 'text-yzy-bone font-bold' : 'text-yzy-ash'
+          className={`flex flex-col items-center gap-1 py-1 px-1.5 ${
+            activeTab === 'tutorials' ? 'text-white font-bold' : 'text-yzy-ash'
           }`}
         >
           <BookOpen className="w-4 h-4" />
@@ -270,7 +249,7 @@ export default function App() {
             playConfirmTone();
             setIsCostModalOpen(true);
           }}
-          className="flex flex-col items-center gap-1 py-1 px-2 text-yzy-neon font-bold"
+          className="flex flex-col items-center gap-1 py-1 px-1.5 text-yzy-neon font-bold"
         >
           <DollarSign className="w-4 h-4" />
           <span>${totalCost.toLocaleString()}</span>
@@ -282,8 +261,8 @@ export default function App() {
         isOpen={isCostModalOpen}
         onClose={() => setIsCostModalOpen(false)}
         infrastructure={selectedInfra}
-        selectedMaterials={selectedMaterials}
-        materialsList={MATERIALS}
+        selectedMaterials={selectedPartMaterials}
+        materialsList={allMaterials}
         utilityPackages={UTILITY_PACKAGES}
         totalCost={totalCost}
         totalCarbon={totalCarbon}
@@ -293,8 +272,8 @@ export default function App() {
         isOpen={isBlueprintModalOpen}
         onClose={() => setIsBlueprintModalOpen(false)}
         infrastructure={selectedInfra}
-        selectedMaterials={selectedMaterials}
-        materialsList={MATERIALS}
+        selectedMaterials={selectedPartMaterials}
+        materialsList={allMaterials}
         utilityPackages={UTILITY_PACKAGES}
         totalCost={totalCost}
         totalCarbon={totalCarbon}
