@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { RotateCcw, Box, Sun, Sparkles, Maximize2, Layers } from 'lucide-react';
+import { RotateCcw, Box, Sun, Sparkles, Maximize2, Layers, AlertCircle } from 'lucide-react';
 import { playTactileClick } from '../utils/audio';
 
 export default function FurnitureViewer3D({
@@ -16,8 +16,8 @@ export default function FurnitureViewer3D({
 
   const [isAutoRotate, setIsAutoRotate] = useState(true);
   const [isWireframe, setIsWireframe] = useState(false);
+  const [webglError, setWebglError] = useState(false);
 
-  // Material Finishes
   const finishes = [
     { id: 'raw_earth', name: 'RAW EARTH', colorHex: '#A07855', roughness: 0.9, metalness: 0.05 },
     { id: 'bone_chalk', name: 'BONE CHALK', colorHex: '#EAEAE6', roughness: 0.85, metalness: 0.05 },
@@ -32,128 +32,129 @@ export default function FurnitureViewer3D({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const width = containerRef.current.clientWidth;
-    const height = containerRef.current.clientHeight || 360;
+    try {
+      const width = containerRef.current.clientWidth || 340;
+      const height = containerRef.current.clientHeight || 340;
 
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0a0a);
-    scene.fog = new THREE.FogExp2(0x0a0a0a, 0.035);
-    sceneRef.current = scene;
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0a0a0a);
+      scene.fog = new THREE.FogExp2(0x0a0a0a, 0.035);
+      sceneRef.current = scene;
 
-    const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
-    camera.position.set(4.5, 3.5, 5.0);
-    camera.lookAt(0, 1.0, 0);
-    cameraRef.current = camera;
+      const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
+      camera.position.set(4.5, 3.5, 5.0);
+      camera.lookAt(0, 1.0, 0);
+      cameraRef.current = camera;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    rendererRef.current = renderer;
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      rendererRef.current = renderer;
 
-    while (containerRef.current.firstChild) {
-      containerRef.current.removeChild(containerRef.current.firstChild);
+      while (containerRef.current.firstChild) {
+        containerRef.current.removeChild(containerRef.current.firstChild);
+      }
+      containerRef.current.appendChild(renderer.domElement);
+
+      // Studio Pedestal Floor
+      const grid = new THREE.GridHelper(16, 16, 0x333333, 0x161616);
+      grid.position.y = -0.01;
+      scene.add(grid);
+
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+      scene.add(ambientLight);
+
+      const keyLight = new THREE.DirectionalLight(0xfff7ea, 2.2);
+      keyLight.position.set(5, 8, 5);
+      keyLight.castShadow = true;
+      scene.add(keyLight);
+
+      const fillLight = new THREE.DirectionalLight(0x4466aa, 0.7);
+      fillLight.position.set(-5, 4, -4);
+      scene.add(fillLight);
+
+      // Furniture Mesh Group
+      const rootGroup = new THREE.Group();
+      scene.add(rootGroup);
+      groupRef.current = rootGroup;
+
+      buildFurnitureGeometry(selectedPiece.id, currentFinish, isWireframe, rootGroup);
+
+      let isDragging = false;
+      let previousMousePosition = { x: 0, y: 0 };
+
+      const handlePointerDown = (e) => {
+        isDragging = true;
+        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+        const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+        previousMousePosition = { x: clientX, y: clientY };
+      };
+
+      const handlePointerMove = (e) => {
+        if (!isDragging) return;
+        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+        const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+
+        const deltaX = clientX - previousMousePosition.x;
+        if (rootGroup) {
+          rootGroup.rotation.y += deltaX * 0.01;
+        }
+        previousMousePosition = { x: clientX, y: clientY };
+      };
+
+      const handlePointerUp = () => {
+        isDragging = false;
+      };
+
+      const domElement = renderer.domElement;
+      domElement.addEventListener('mousedown', handlePointerDown);
+      domElement.addEventListener('mousemove', handlePointerMove);
+      window.addEventListener('mouseup', handlePointerUp);
+
+      domElement.addEventListener('touchstart', handlePointerDown, { passive: true });
+      domElement.addEventListener('touchmove', handlePointerMove, { passive: true });
+      window.addEventListener('touchend', handlePointerUp);
+
+      let animationFrameId;
+      const animate = () => {
+        animationFrameId = requestAnimationFrame(animate);
+        if (isAutoRotate && !isDragging && rootGroup) {
+          rootGroup.rotation.y += 0.005;
+        }
+        renderer.render(scene, camera);
+      };
+      animate();
+
+      const handleResize = () => {
+        if (!containerRef.current || !renderer || !camera) return;
+        const newWidth = containerRef.current.clientWidth;
+        const newHeight = containerRef.current.clientHeight || 340;
+        camera.aspect = newWidth / newHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(newWidth, newHeight);
+      };
+      window.addEventListener('resize', handleResize);
+
+      return () => {
+        cancelAnimationFrame(animationFrameId);
+        window.removeEventListener('resize', handleResize);
+        window.removeEventListener('mouseup', handlePointerUp);
+        window.removeEventListener('touchend', handlePointerUp);
+        domElement.removeEventListener('mousedown', handlePointerDown);
+        domElement.removeEventListener('mousemove', handlePointerMove);
+        domElement.removeEventListener('touchstart', handlePointerDown);
+        domElement.removeEventListener('touchmove', handlePointerMove);
+        renderer.dispose();
+      };
+    } catch (err) {
+      console.error("Furniture WebGL error:", err);
+      setWebglError(true);
     }
-    containerRef.current.appendChild(renderer.domElement);
-
-    // Studio Pedestal Floor
-    const grid = new THREE.GridHelper(16, 16, 0x333333, 0x161616);
-    grid.position.y = -0.01;
-    scene.add(grid);
-
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
-    scene.add(ambientLight);
-
-    const keyLight = new THREE.DirectionalLight(0xfff7ea, 2.2);
-    keyLight.position.set(5, 8, 5);
-    keyLight.castShadow = true;
-    keyLight.shadow.mapSize.width = 1024;
-    keyLight.shadow.mapSize.height = 1024;
-    scene.add(keyLight);
-
-    const fillLight = new THREE.DirectionalLight(0x4466aa, 0.7);
-    fillLight.position.set(-5, 4, -4);
-    scene.add(fillLight);
-
-    // Furniture Mesh Group
-    const rootGroup = new THREE.Group();
-    scene.add(rootGroup);
-    groupRef.current = rootGroup;
-
-    buildFurnitureGeometry(selectedPiece.id, currentFinish, isWireframe, rootGroup);
-
-    // Touch & Mouse Drag
-    let isDragging = false;
-    let previousMousePosition = { x: 0, y: 0 };
-
-    const handlePointerDown = (e) => {
-      isDragging = true;
-      const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-      const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-      previousMousePosition = { x: clientX, y: clientY };
-    };
-
-    const handlePointerMove = (e) => {
-      if (!isDragging) return;
-      const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-      const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-
-      const deltaX = clientX - previousMousePosition.x;
-      if (rootGroup) {
-        rootGroup.rotation.y += deltaX * 0.01;
-      }
-      previousMousePosition = { x: clientX, y: clientY };
-    };
-
-    const handlePointerUp = () => {
-      isDragging = false;
-    };
-
-    const domElement = renderer.domElement;
-    domElement.addEventListener('mousedown', handlePointerDown);
-    domElement.addEventListener('mousemove', handlePointerMove);
-    window.addEventListener('mouseup', handlePointerUp);
-
-    domElement.addEventListener('touchstart', handlePointerDown, { passive: true });
-    domElement.addEventListener('touchmove', handlePointerMove, { passive: true });
-    window.addEventListener('touchend', handlePointerUp);
-
-    let animationFrameId;
-    const animate = () => {
-      animationFrameId = requestAnimationFrame(animate);
-      if (isAutoRotate && !isDragging && rootGroup) {
-        rootGroup.rotation.y += 0.005;
-      }
-      renderer.render(scene, camera);
-    };
-    animate();
-
-    const handleResize = () => {
-      if (!containerRef.current || !renderer || !camera) return;
-      const newWidth = containerRef.current.clientWidth;
-      const newHeight = containerRef.current.clientHeight || 360;
-      camera.aspect = newWidth / newHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(newWidth, newHeight);
-    };
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('mouseup', handlePointerUp);
-      window.removeEventListener('touchend', handlePointerUp);
-      domElement.removeEventListener('mousedown', handlePointerDown);
-      domElement.removeEventListener('mousemove', handlePointerMove);
-      domElement.removeEventListener('touchstart', handlePointerDown);
-      domElement.removeEventListener('touchmove', handlePointerMove);
-      renderer.dispose();
-    };
   }, [selectedPiece.id]);
 
-  // Update Material when finish changes
   useEffect(() => {
     if (!groupRef.current) return;
     buildFurnitureGeometry(selectedPiece.id, currentFinish, isWireframe, groupRef.current);
@@ -186,7 +187,6 @@ export default function FurnitureViewer3D({
     });
 
     if (pieceId === 'mycelium_lounge_chair') {
-      // Sculptural brutalist lounge chair
       const seatGeo = new THREE.CylinderGeometry(1.2, 1.4, 0.4, 24);
       const seat = new THREE.Mesh(seatGeo, mat);
       seat.position.y = 0.6;
@@ -206,7 +206,6 @@ export default function FurnitureViewer3D({
       parentGroup.add(base);
 
     } else if (pieceId === 'rammed_earth_desk') {
-      // Massive monolithic desk
       const topGeo = new THREE.BoxGeometry(3.6, 0.3, 1.8);
       const top = new THREE.Mesh(topGeo, mat);
       top.position.y = 1.4;
@@ -224,14 +223,12 @@ export default function FurnitureViewer3D({
       rightLeg.castShadow = true;
       parentGroup.add(rightLeg);
 
-      // Induction stone pad inlay
       const padGeo = new THREE.BoxGeometry(0.8, 0.05, 0.8);
       const pad = new THREE.Mesh(padGeo, accentMat);
       pad.position.set(1.0, 1.56, -0.2);
       parentGroup.add(pad);
 
     } else if (pieceId === 'clt_studio_workbench') {
-      // Mass timber slab workbench
       const topGeo = new THREE.BoxGeometry(4.0, 0.25, 2.0);
       const top = new THREE.Mesh(topGeo, mat);
       top.position.y = 1.35;
@@ -249,7 +246,6 @@ export default function FurnitureViewer3D({
       }
 
     } else if (pieceId === 'hemp_acoustic_screen') {
-      // Freestanding partition screen
       const panelGeo = new THREE.BoxGeometry(2.2, 3.2, 0.15);
       const panel = new THREE.Mesh(panelGeo, mat);
       panel.position.y = 1.65;
@@ -262,7 +258,6 @@ export default function FurnitureViewer3D({
       parentGroup.add(base);
 
     } else if (pieceId === 'recycled_poly_stool') {
-      // Fluted brutalist cylinder stool
       const stoolGeo = new THREE.CylinderGeometry(0.65, 0.75, 1.1, 16);
       const stool = new THREE.Mesh(stoolGeo, mat);
       stool.position.y = 0.55;
@@ -270,7 +265,6 @@ export default function FurnitureViewer3D({
       parentGroup.add(stool);
 
     } else if (pieceId === 'geopolymer_sink_counter') {
-      // Monolithic sink & ramp basin
       const blockGeo = new THREE.BoxGeometry(2.6, 0.6, 1.4);
       const block = new THREE.Mesh(blockGeo, mat);
       block.position.y = 1.1;
@@ -288,7 +282,6 @@ export default function FurnitureViewer3D({
       parentGroup.add(base);
 
     } else if (pieceId === 'bamboo_daybed') {
-      // Low slung platform daybed
       const platGeo = new THREE.BoxGeometry(4.0, 0.3, 2.8);
       const plat = new THREE.Mesh(platGeo, mat);
       plat.position.y = 0.25;
@@ -301,13 +294,24 @@ export default function FurnitureViewer3D({
       parentGroup.add(matMesh);
 
     } else {
-      // Aircrete plinth pedestal
       const pedGeo = new THREE.CylinderGeometry(0.7, 0.7, 1.2, 6);
       const ped = new THREE.Mesh(pedGeo, mat);
       ped.position.y = 0.6;
       ped.castShadow = true;
       parentGroup.add(ped);
     }
+  }
+
+  if (webglError) {
+    return (
+      <div className="w-full h-64 bg-yzy-obsidian border border-yzy-slate flex flex-col items-center justify-center p-6 text-center font-mono">
+        <AlertCircle className="w-8 h-8 text-yzy-warning mb-2" />
+        <span className="font-bold text-white text-sm uppercase">3D PREVIEW UNAVAILABLE</span>
+        <span className="text-xs text-yzy-ash max-w-sm mt-1">
+          Select finishes and review piece specifications below.
+        </span>
+      </div>
+    );
   }
 
   return (

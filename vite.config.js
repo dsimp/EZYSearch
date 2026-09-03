@@ -5,6 +5,10 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: './', // Ensures assets load properly on GitHub Pages, Surge, Netlify, or any subpath
+  build: {
+    target: ['es2020', 'safari14', 'ios14'], // Ensures total compatibility with iPhone XS Max and mobile WebKit
+    minify: 'esbuild'
+  },
   server: {
     host: true,
     port: 5173,

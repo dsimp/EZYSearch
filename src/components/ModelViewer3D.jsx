@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Layers, Eye, Sun, Box, RotateCcw, Maximize2, Sparkles, Check, Info, MousePointer, Focus, Scan } from 'lucide-react';
+import { Layers, Eye, Sun, Box, RotateCcw, Maximize2, Sparkles, Check, Info, MousePointer, Focus, Scan, AlertCircle } from 'lucide-react';
 import { playTactileClick, playSelectTone } from '../utils/audio';
 import { ARCHETYPE_PARTS, APERTURE_MATERIALS } from '../data/partCatalog';
 
@@ -21,140 +21,107 @@ export default function ModelViewer3D({
 
   const [isWireframe, setIsWireframe] = useState(false);
   const [isExploded, setIsExploded] = useState(false);
-  const [isIsolatedFocus, setIsIsolatedFocus] = useState(true); // Center Stage Focus mode
+  const [isIsolatedFocus, setIsIsolatedFocus] = useState(true);
   const [sunAngle, setSunAngle] = useState(45);
   const [isAutoRotate, setIsAutoRotate] = useState(false);
   const [hoveredPartName, setHoveredPartName] = useState(null);
+  const [webglError, setWebglError] = useState(false);
 
   const allMaterials = [...materialsList, ...APERTURE_MATERIALS];
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const width = containerRef.current.clientWidth;
-    const height = containerRef.current.clientHeight || 460;
+    try {
+      const width = containerRef.current.clientWidth || 360;
+      const height = containerRef.current.clientHeight || 420;
 
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0a0a);
-    scene.fog = new THREE.FogExp2(0x0a0a0a, 0.022);
-    sceneRef.current = scene;
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0a0a0a);
+      scene.fog = new THREE.FogExp2(0x0a0a0a, 0.022);
+      sceneRef.current = scene;
 
-    const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 1000);
-    camera.position.set(18, 15, 22);
-    camera.lookAt(0, 2.5, 0);
-    cameraRef.current = camera;
+      const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 1000);
+      camera.position.set(18, 15, 22);
+      camera.lookAt(0, 2.5, 0);
+      cameraRef.current = camera;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    rendererRef.current = renderer;
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      rendererRef.current = renderer;
 
-    while (containerRef.current.firstChild) {
-      containerRef.current.removeChild(containerRef.current.firstChild);
-    }
-    containerRef.current.appendChild(renderer.domElement);
-
-    // Grid Floor
-    const gridHelper = new THREE.GridHelper(40, 40, 0x333333, 0x181818);
-    gridHelper.position.y = -0.01;
-    scene.add(gridHelper);
-
-    // Polar Rings
-    const circleGeo = new THREE.RingGeometry(11.9, 12, 64);
-    const circleMat = new THREE.MeshBasicMaterial({ color: 0x2a2a2a, side: THREE.DoubleSide });
-    const circleMesh = new THREE.Mesh(circleGeo, circleMat);
-    circleMesh.rotation.x = Math.PI / 2;
-    circleMesh.position.y = 0.01;
-    scene.add(circleMesh);
-
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
-    scene.add(ambientLight);
-
-    const sunLight = new THREE.DirectionalLight(0xfff7ea, 2.0);
-    sunLight.position.set(16, 26, 16);
-    sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 1024;
-    sunLight.shadow.mapSize.height = 1024;
-    const d = 16;
-    sunLight.shadow.camera.left = -d;
-    sunLight.shadow.camera.right = d;
-    sunLight.shadow.camera.top = d;
-    sunLight.shadow.camera.bottom = -d;
-    scene.add(sunLight);
-
-    const rimLight = new THREE.DirectionalLight(0x4477bb, 0.6);
-    rimLight.position.set(-15, 12, -15);
-    scene.add(rimLight);
-
-    // Main Archetype Model Group
-    const rootGroup = new THREE.Group();
-    scene.add(rootGroup);
-    groupRef.current = rootGroup;
-
-    buildArchetypeGeometry(infrastructure, selectedPartMaterials, isWireframe, rootGroup, partMeshesRef);
-
-    // Raycasting for direct part clicking
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-
-    let isDragging = false;
-    let dragDistance = 0;
-    let previousMousePosition = { x: 0, y: 0 };
-
-    const handlePointerDown = (e) => {
-      isDragging = true;
-      dragDistance = 0;
-      const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-      const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-      previousMousePosition = { x: clientX, y: clientY };
-    };
-
-    const handlePointerMove = (e) => {
-      const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-      const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-
-      if (isDragging) {
-        const deltaX = clientX - previousMousePosition.x;
-        const deltaY = clientY - previousMousePosition.y;
-        dragDistance += Math.abs(deltaX) + Math.abs(deltaY);
-
-        if (rootGroup) {
-          rootGroup.rotation.y += deltaX * 0.008;
-        }
+      while (containerRef.current.firstChild) {
+        containerRef.current.removeChild(containerRef.current.firstChild);
       }
+      containerRef.current.appendChild(renderer.domElement);
 
-      // Check Hover
-      const rect = renderer.domElement.getBoundingClientRect();
-      mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+      // Grid Floor
+      const gridHelper = new THREE.GridHelper(40, 40, 0x333333, 0x181818);
+      gridHelper.position.y = -0.01;
+      scene.add(gridHelper);
 
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(rootGroup.children, true);
+      // Polar Rings
+      const circleGeo = new THREE.RingGeometry(11.9, 12, 48);
+      const circleMat = new THREE.MeshBasicMaterial({ color: 0x2a2a2a, side: THREE.DoubleSide });
+      const circleMesh = new THREE.Mesh(circleGeo, circleMat);
+      circleMesh.rotation.x = Math.PI / 2;
+      circleMesh.position.y = 0.01;
+      scene.add(circleMesh);
 
-      if (intersects.length > 0) {
-        let topMesh = intersects[0].object;
-        while (topMesh.parent && !topMesh.userData?.partId && topMesh.parent !== rootGroup) {
-          topMesh = topMesh.parent;
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+      scene.add(ambientLight);
+
+      const sunLight = new THREE.DirectionalLight(0xfff7ea, 2.0);
+      sunLight.position.set(16, 26, 16);
+      sunLight.castShadow = true;
+      scene.add(sunLight);
+
+      const rimLight = new THREE.DirectionalLight(0x4477bb, 0.6);
+      rimLight.position.set(-15, 12, -15);
+      scene.add(rimLight);
+
+      // Main Archetype Model Group
+      const rootGroup = new THREE.Group();
+      scene.add(rootGroup);
+      groupRef.current = rootGroup;
+
+      buildArchetypeGeometry(infrastructure, selectedPartMaterials, isWireframe, rootGroup, partMeshesRef);
+
+      // Raycasting for direct part clicking
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+
+      let isDragging = false;
+      let dragDistance = 0;
+      let previousMousePosition = { x: 0, y: 0 };
+
+      const handlePointerDown = (e) => {
+        isDragging = true;
+        dragDistance = 0;
+        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+        const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+        previousMousePosition = { x: clientX, y: clientY };
+      };
+
+      const handlePointerMove = (e) => {
+        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+        const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+
+        if (isDragging) {
+          const deltaX = clientX - previousMousePosition.x;
+          const deltaY = clientY - previousMousePosition.y;
+          dragDistance += Math.abs(deltaX) + Math.abs(deltaY);
+
+          if (rootGroup) {
+            rootGroup.rotation.y += deltaX * 0.008;
+          }
         }
-        if (topMesh.userData?.partName) {
-          setHoveredPartName(topMesh.userData.partName);
-        }
-      } else {
-        setHoveredPartName(null);
-      }
 
-      previousMousePosition = { x: clientX, y: clientY };
-    };
-
-    const handlePointerUp = (e) => {
-      if (dragDistance < 8) {
-        const clientX = e.clientX || (e.changedTouches && e.changedTouches[0]?.clientX);
-        const clientY = e.clientY || (e.changedTouches && e.changedTouches[0]?.clientY);
-
-        if (clientX !== undefined && clientY !== undefined) {
+        if (renderer && renderer.domElement) {
           const rect = renderer.domElement.getBoundingClientRect();
           mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
           mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
@@ -163,62 +130,95 @@ export default function ModelViewer3D({
           const intersects = raycaster.intersectObjects(rootGroup.children, true);
 
           if (intersects.length > 0) {
-            let hitObj = intersects[0].object;
-            while (hitObj.parent && !hitObj.userData?.partId && hitObj.parent !== rootGroup) {
-              hitObj = hitObj.parent;
+            let topMesh = intersects[0].object;
+            while (topMesh.parent && !topMesh.userData?.partId && topMesh.parent !== rootGroup) {
+              topMesh = topMesh.parent;
             }
-            if (hitObj.userData?.partId) {
-              playSelectTone();
-              onSelectPart(hitObj.userData.partId);
+            if (topMesh.userData?.partName) {
+              setHoveredPartName(topMesh.userData.partName);
+            }
+          } else {
+            setHoveredPartName(null);
+          }
+        }
+
+        previousMousePosition = { x: clientX, y: clientY };
+      };
+
+      const handlePointerUp = (e) => {
+        if (dragDistance < 8 && renderer && renderer.domElement) {
+          const clientX = e.clientX || (e.changedTouches && e.changedTouches[0]?.clientX);
+          const clientY = e.clientY || (e.changedTouches && e.changedTouches[0]?.clientY);
+
+          if (clientX !== undefined && clientY !== undefined) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(rootGroup.children, true);
+
+            if (intersects.length > 0) {
+              let hitObj = intersects[0].object;
+              while (hitObj.parent && !hitObj.userData?.partId && hitObj.parent !== rootGroup) {
+                hitObj = hitObj.parent;
+              }
+              if (hitObj.userData?.partId) {
+                playSelectTone();
+                onSelectPart(hitObj.userData.partId);
+              }
             }
           }
         }
-      }
-      isDragging = false;
-    };
+        isDragging = false;
+      };
 
-    const domElement = renderer.domElement;
-    domElement.addEventListener('mousedown', handlePointerDown);
-    domElement.addEventListener('mousemove', handlePointerMove);
-    window.addEventListener('mouseup', handlePointerUp);
+      const domElement = renderer.domElement;
+      domElement.addEventListener('mousedown', handlePointerDown);
+      domElement.addEventListener('mousemove', handlePointerMove);
+      window.addEventListener('mouseup', handlePointerUp);
 
-    domElement.addEventListener('touchstart', handlePointerDown, { passive: true });
-    domElement.addEventListener('touchmove', handlePointerMove, { passive: true });
-    window.addEventListener('touchend', handlePointerUp);
+      domElement.addEventListener('touchstart', handlePointerDown, { passive: true });
+      domElement.addEventListener('touchmove', handlePointerMove, { passive: true });
+      window.addEventListener('touchend', handlePointerUp);
 
-    let animationFrameId;
-    const animate = () => {
-      animationFrameId = requestAnimationFrame(animate);
+      let animationFrameId;
+      const animate = () => {
+        animationFrameId = requestAnimationFrame(animate);
 
-      if (isAutoRotate && !isDragging && rootGroup) {
-        rootGroup.rotation.y += 0.003;
-      }
+        if (isAutoRotate && !isDragging && rootGroup) {
+          rootGroup.rotation.y += 0.003;
+        }
 
-      renderer.render(scene, camera);
-    };
-    animate();
+        renderer.render(scene, camera);
+      };
+      animate();
 
-    const handleResize = () => {
-      if (!containerRef.current || !renderer || !camera) return;
-      const newWidth = containerRef.current.clientWidth;
-      const newHeight = containerRef.current.clientHeight || 460;
-      camera.aspect = newWidth / newHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(newWidth, newHeight);
-    };
-    window.addEventListener('resize', handleResize);
+      const handleResize = () => {
+        if (!containerRef.current || !renderer || !camera) return;
+        const newWidth = containerRef.current.clientWidth;
+        const newHeight = containerRef.current.clientHeight || 420;
+        camera.aspect = newWidth / newHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(newWidth, newHeight);
+      };
+      window.addEventListener('resize', handleResize);
 
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('mouseup', handlePointerUp);
-      window.removeEventListener('touchend', handlePointerUp);
-      domElement.removeEventListener('mousedown', handlePointerDown);
-      domElement.removeEventListener('mousemove', handlePointerMove);
-      domElement.removeEventListener('touchstart', handlePointerDown);
-      domElement.removeEventListener('touchmove', handlePointerMove);
-      renderer.dispose();
-    };
+      return () => {
+        cancelAnimationFrame(animationFrameId);
+        window.removeEventListener('resize', handleResize);
+        window.removeEventListener('mouseup', handlePointerUp);
+        window.removeEventListener('touchend', handlePointerUp);
+        domElement.removeEventListener('mousedown', handlePointerDown);
+        domElement.removeEventListener('mousemove', handlePointerMove);
+        domElement.removeEventListener('touchstart', handlePointerDown);
+        domElement.removeEventListener('touchmove', handlePointerMove);
+        renderer.dispose();
+      };
+    } catch (err) {
+      console.error("WebGL initialization error:", err);
+      setWebglError(true);
+    }
   }, [infrastructure.id]);
 
   useEffect(() => {
@@ -238,16 +238,13 @@ export default function ModelViewer3D({
       const isSelected = partId === activePartId;
 
       if (isExploded) {
-        // Explode Mode: All pieces expand outward
         const offset = partObj.userData?.explodeOffset || { x: 0, y: 0, z: 0 };
         partObj.position.set(offset.x * 2.2, offset.y * 2.4, offset.z * 2.2);
         partObj.scale.set(1, 1, 1);
         restorePartOpacity(partObj);
 
       } else if (isIsolatedFocus && activePartId) {
-        // CENTER STAGE FOCUS MODE
         if (isSelected) {
-          // Selected part floats forward to center stage and scales slightly up
           const pullDir = partObj.userData?.pullDirection || { x: 0, y: 1.2, z: 1.5 };
           partObj.position.set(pullDir.x * 1.8, pullDir.y * 1.6, pullDir.z * 1.8);
           partObj.scale.set(1.08, 1.08, 1.08);
@@ -261,7 +258,6 @@ export default function ModelViewer3D({
             }
           });
         } else {
-          // Other parts fade into subtle blueprint ghost
           partObj.position.set(0, 0, 0);
           partObj.scale.set(0.98, 0.98, 0.98);
 
@@ -275,7 +271,6 @@ export default function ModelViewer3D({
           });
         }
       } else {
-        // Standard Full Building View
         partObj.position.set(0, 0, 0);
         partObj.scale.set(1, 1, 1);
         restorePartOpacity(partObj);
@@ -316,14 +311,12 @@ export default function ModelViewer3D({
       const color = mat ? parseInt(mat.colorHex.replace('#', '0x')) : fallbackColor;
 
       if (isGlass) {
-        const glassMat = new THREE.MeshPhysicalMaterial({
+        const glassMat = new THREE.MeshStandardMaterial({
           color: color,
           transparent: true,
           opacity: matId === 'smart_solar_glass' ? 0.65 : 0.4,
           roughness: 0.1,
-          metalness: 0.1,
-          transmission: 0.85,
-          ior: 1.5,
+          metalness: 0.2,
           wireframe: wireframe
         });
         glassMat.userData = { isGlass: true };
@@ -483,6 +476,18 @@ export default function ModelViewer3D({
     rendererRef.current.setSize(newWidth, newHeight);
   }, [isCompact]);
 
+  if (webglError) {
+    return (
+      <div className="w-full h-72 bg-yzy-obsidian border border-yzy-slate flex flex-col items-center justify-center p-6 text-center font-mono">
+        <AlertCircle className="w-8 h-8 text-yzy-warning mb-2" />
+        <span className="font-bold text-white text-sm uppercase">2D ARCHITECTURAL MODE ACTIVE</span>
+        <span className="text-xs text-yzy-ash max-w-sm mt-1">
+          WebGL acceleration disabled. You can continue customizing components and materials in the matrix below.
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className={`relative w-full transition-all duration-300 ${isCompact ? 'h-52 sm:h-60 md:h-72 shadow-2xl ring-1 ring-yzy-bone/40' : 'h-80 sm:h-96 md:h-[480px]'} bg-yzy-obsidian border border-yzy-slate/70 overflow-hidden flex flex-col select-none`}>
       <div ref={containerRef} className="w-full h-full cursor-grab active:cursor-grabbing touch-none" />
@@ -519,7 +524,6 @@ export default function ModelViewer3D({
 
       {/* Bottom Floating Control Bar */}
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 sm:gap-2 bg-yzy-black/90 backdrop-blur-md px-3 py-2 border border-yzy-slate shadow-2xl z-10">
-        {/* Toggle Center Stage Focus Mode */}
         <button
           onClick={() => {
             playTactileClick();
@@ -533,16 +537,15 @@ export default function ModelViewer3D({
           title="Pull and isolate the selected part in the center of the screen"
         >
           <Focus className="w-3.5 h-3.5" />
-          <span>{isIsolatedFocus ? 'CENTER STAGE ACTIVE' : 'FULL BUILDING VIEW'}</span>
+          <span>{isIsolatedFocus ? 'CENTER STAGE' : 'FULL VIEW'}</span>
         </button>
 
-        {/* Explode Mode */}
         <button
           onClick={() => {
             playTactileClick();
             setIsExploded(!isExploded);
           }}
-          className={`flex items-center gap-1.5 px-2 py-1.5 font-mono text-[10px] sm:text-xs tracking-wider transition-all ${
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 font-mono text-[10px] sm:text-xs tracking-wider transition-all ${
             isExploded
               ? 'bg-yzy-neon text-yzy-black font-bold'
               : 'text-yzy-chalk hover:text-white hover:bg-yzy-slate/60'
@@ -552,7 +555,6 @@ export default function ModelViewer3D({
           <span>EXPLODE</span>
         </button>
 
-        {/* Wireframe */}
         <button
           onClick={() => {
             playTactileClick();
@@ -565,7 +567,6 @@ export default function ModelViewer3D({
           CAD
         </button>
 
-        {/* Turntable */}
         <button
           onClick={() => {
             playTactileClick();

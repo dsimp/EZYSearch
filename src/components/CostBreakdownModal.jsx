@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, DollarSign, Download, Check, Shield, Layers, Leaf, Cpu } from 'lucide-react';
 import { playTactileClick, playConfirmTone } from '../utils/audio';
+import { ARCHETYPE_PARTS } from '../data/partCatalog';
 
 export default function CostBreakdownModal({
   isOpen,
@@ -14,59 +15,44 @@ export default function CostBreakdownModal({
 }) {
   if (!isOpen) return null;
 
-  // Calculate detailed line items
-  const items = [
-    {
-      layer: '01. FOUNDATION & SUBGRADE',
-      mat: materialsList.find((m) => m.id === selectedMaterials.foundation),
-      calc: `$${((infrastructure.sqft * 0.8) * (materialsList.find((m) => m.id === selectedMaterials.foundation)?.costPerSqFt || 3.5)).toFixed(0)}`,
-      costNum: Math.round((infrastructure.sqft * 0.8) * (materialsList.find((m) => m.id === selectedMaterials.foundation)?.costPerSqFt || 3.5))
-    },
-    {
-      layer: '02. CORE SUPERSTRUCTURE',
-      mat: materialsList.find((m) => m.id === selectedMaterials.superstructure),
-      calc: `$${((infrastructure.sqft * 0.6) * (materialsList.find((m) => m.id === selectedMaterials.superstructure)?.costPerSqFt || 4.5)).toFixed(0)}`,
-      costNum: Math.round((infrastructure.sqft * 0.6) * (materialsList.find((m) => m.id === selectedMaterials.superstructure)?.costPerSqFt || 4.5))
-    },
-    {
-      layer: '03. THERMAL ENVELOPE / WALLS',
-      mat: materialsList.find((m) => m.id === selectedMaterials.walls),
-      calc: `$${((infrastructure.sqft * 1.4) * (materialsList.find((m) => m.id === selectedMaterials.walls)?.costPerSqFt || 4.2)).toFixed(0)}`,
-      costNum: Math.round((infrastructure.sqft * 1.4) * (materialsList.find((m) => m.id === selectedMaterials.walls)?.costPerSqFt || 4.2))
-    },
-    {
-      layer: '04. ROOF & CANOPY VAULT',
-      mat: materialsList.find((m) => m.id === selectedMaterials.roof),
-      calc: `$${((infrastructure.sqft * 1.1) * (materialsList.find((m) => m.id === selectedMaterials.roof)?.costPerSqFt || 3.8)).toFixed(0)}`,
-      costNum: Math.round((infrastructure.sqft * 1.1) * (materialsList.find((m) => m.id === selectedMaterials.roof)?.costPerSqFt || 3.8))
-    },
-    {
-      layer: '05. BIO-ACOUSTIC INSULATION',
-      mat: materialsList.find((m) => m.id === selectedMaterials.insulation),
-      calc: `$${((infrastructure.sqft * 1.0) * (materialsList.find((m) => m.id === selectedMaterials.insulation)?.costPerSqFt || 2.9)).toFixed(0)}`,
-      costNum: Math.round((infrastructure.sqft * 1.0) * (materialsList.find((m) => m.id === selectedMaterials.insulation)?.costPerSqFt || 2.9))
-    },
-    {
-      layer: '06. OFF-GRID UTILITY SUITE',
-      mat: utilityPackages.find((u) => u.id === selectedMaterials.utilities),
-      calc: `$${(utilityPackages.find((u) => u.id === selectedMaterials.utilities)?.cost || 2400).toLocaleString()}`,
-      costNum: utilityPackages.find((u) => u.id === selectedMaterials.utilities)?.cost || 2400
+  // Retrieve archetype parts
+  const parts = ARCHETYPE_PARTS[infrastructure.id] || ARCHETYPE_PARTS.yzy_mono_dome;
+
+  // Calculate detailed line items for each part
+  const items = parts.map((part) => {
+    const matId = selectedMaterials[part.id] || part.defaultMaterial;
+    const mat = materialsList.find((m) => m.id === matId) || utilityPackages.find((u) => u.id === matId);
+    
+    let cost = 0;
+    if (mat?.cost !== undefined) {
+      cost = mat.cost;
+    } else if (mat?.costPerSqFt !== undefined) {
+      cost = Math.round(part.surfaceAreaSqft * mat.costPerSqFt);
+    } else {
+      cost = Math.round(part.surfaceAreaSqft * 4.20);
     }
-  ];
+
+    return {
+      layer: part.name,
+      mat: mat,
+      calc: `$${cost.toLocaleString()}`,
+      costNum: cost
+    };
+  });
 
   const subtotalMaterials = items.reduce((acc, curr) => acc + curr.costNum, 0);
   const toolEquipmentRental = 650; // Community shared equipment
   const contingencyBuffer = Math.round(subtotalMaterials * 0.08);
   const finalTotal = subtotalMaterials + toolEquipmentRental + contingencyBuffer;
 
-  const costPerSqFt = (finalTotal / infrastructure.sqft).toFixed(2);
+  const costPerSqFt = infrastructure.sqft ? (finalTotal / infrastructure.sqft).toFixed(2) : "0.00";
 
   const exportCSV = () => {
     playConfirmTone();
     let csvContent = "data:text/csv;charset=utf-8,";
     csvContent += "ARCHITECTURAL COMPONENT,SPECIFIED MATERIAL,UNIT METRIC,ESTIMATED COST\n";
     items.forEach((item) => {
-      csvContent += `"${item.layer}","${item.mat?.name || item.mat?.shortName}","${item.mat?.unitCost || 'Package'}","${item.calc}"\n`;
+      csvContent += `"${item.layer}","${item.mat?.name || item.mat?.shortName || 'Custom'}","${item.mat?.unitCost || 'Package'}","${item.calc}"\n`;
     });
     csvContent += `"TOOLING & EQUIPMENT","Community Press Kit","One-Time Rental","$${toolEquipmentRental}"\n`;
     csvContent += `"CONTINGENCY BUFFER","8% Waste Reserve","Contingency","$${contingencyBuffer}"\n`;
@@ -135,7 +121,7 @@ export default function CostBreakdownModal({
               {items.map((item, idx) => (
                 <tr key={idx} className="hover:bg-yzy-charcoal/30">
                   <td className="py-2.5 px-2 font-bold text-yzy-chalk text-[11px]">{item.layer}</td>
-                  <td className="py-2.5 px-2 text-yzy-ash text-[11px]">{item.mat?.name || item.mat?.shortName}</td>
+                  <td className="py-2.5 px-2 text-yzy-ash text-[11px]">{item.mat?.name || item.mat?.shortName || 'Custom Spec'}</td>
                   <td className="py-2.5 px-2 text-right font-bold text-yzy-bone text-[11px]">{item.calc}</td>
                 </tr>
               ))}
