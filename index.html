@@ -8,6 +8,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>EZY INFRA — SUSTAINABLE ARCHITECTURAL ECOSYSTEM</title>
+    <script>
+      // Ensure trailing slash on GitHub Pages subdirectory so relative assets always resolve
+      if (window.location.hostname.includes('github.io') && window.location.pathname === '/EZYSearch') {
+        window.location.replace('/EZYSearch/');
+      }
+    </script>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,6 +22,11 @@
     <link rel="stylesheet" crossorigin href="./assets/index-B1Manv2M.css">
   </head>
   <body class="bg-yzy-black text-yzy-bone antialiased selection:bg-yzy-bone selection:text-yzy-black min-h-screen overflow-x-hidden font-sans">
-    <div id="root"></div>
+    <div id="root">
+      <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #070707; color: #EAEAE6; font-family: monospace; font-size: 11px; letter-spacing: 0.15em;">
+        <div style="width: 8px; height: 8px; background-color: #00FF66; border-radius: 50%; margin-bottom: 12px; animation: pulse 1.2s infinite alternate;"></div>
+        <div>EZY.INFRA // INITIALIZING ECOSYSTEM...</div>
+      </div>
+    </div>
   </body>
 </html>
