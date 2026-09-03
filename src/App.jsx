@@ -41,6 +41,16 @@ export default function App() {
 
   const [selectedPartMaterials, setSelectedPartMaterials] = useState(initialPartMap);
   const [activePartId, setActivePartId] = useState(initialParts[1]?.id || initialParts[0].id);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  // Scroll listener for sticky 3D center stage viewport
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 160);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Modals
   const [isCostModalOpen, setIsCostModalOpen] = useState(false);
@@ -124,32 +134,39 @@ export default function App() {
               onSelectInfra={handleSelectInfra}
             />
 
-            {/* Step 2: 3D Pick & Pull Interactive Canvas Viewport */}
-            <div className="flex flex-col gap-2">
+            {/* Step 2: 3D Pick & Pull Interactive Canvas Viewport (Sticky on Scroll) */}
+            <div className={`transition-all duration-300 ${
+              isScrolled 
+                ? 'sticky top-[42px] z-30 shadow-2xl bg-yzy-black/95 backdrop-blur-md pt-1 pb-2 border-b border-yzy-bone/40 -mx-3 px-3 sm:-mx-6 sm:px-6' 
+                : 'relative flex flex-col gap-2'
+            }`}>
               <ModelViewer3D
                 infrastructure={selectedInfra}
                 selectedPartMaterials={selectedPartMaterials}
                 activePartId={activePartId}
                 onSelectPart={(partId) => setActivePartId(partId)}
                 materialsList={MATERIALS}
+                isCompact={isScrolled}
               />
               
               {/* Telemetry Bar Under 3D Viewport */}
-              <div className="bg-yzy-obsidian border border-yzy-slate/60 p-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono">
+              <div className={`bg-yzy-obsidian border border-yzy-slate/60 p-2 sm:p-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] sm:text-[11px] font-mono ${
+                isScrolled ? 'hidden md:grid' : 'grid'
+              }`}>
                 <div>
-                  <span className="text-yzy-ash text-[9px] uppercase block">ACTIVE MODEL</span>
-                  <span className="font-bold text-white">{selectedInfra.name}</span>
+                  <span className="text-yzy-ash text-[8px] sm:text-[9px] uppercase block">ACTIVE MODEL</span>
+                  <span className="font-bold text-white truncate block">{selectedInfra.name}</span>
                 </div>
                 <div>
-                  <span className="text-yzy-ash text-[9px] uppercase block">FOOTPRINT</span>
+                  <span className="text-yzy-ash text-[8px] sm:text-[9px] uppercase block">FOOTPRINT</span>
                   <span className="font-bold text-white">{selectedInfra.sqft} SQ FT</span>
                 </div>
                 <div>
-                  <span className="text-yzy-ash text-[9px] uppercase block">LIVE ESTIMATED COST</span>
+                  <span className="text-yzy-ash text-[8px] sm:text-[9px] uppercase block">LIVE ESTIMATED COST</span>
                   <span className="font-bold text-yzy-neon">${totalCost.toLocaleString()}</span>
                 </div>
                 <div>
-                  <span className="text-yzy-ash text-[9px] uppercase block">NET CARBON IMPACT</span>
+                  <span className="text-yzy-ash text-[8px] sm:text-[9px] uppercase block">NET CARBON IMPACT</span>
                   <span className="font-bold text-yzy-neon">{totalCarbon} kg CO2</span>
                 </div>
               </div>

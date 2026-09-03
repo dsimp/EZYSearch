@@ -1,15 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Layers, Eye, Sun, Box, RotateCcw, Maximize2, Sparkles, Check, Info, MousePointer } from 'lucide-react';
+import { Layers, Eye, Sun, Box, RotateCcw, Maximize2, Sparkles, Check, Info, MousePointer, Focus, Scan } from 'lucide-react';
 import { playTactileClick, playSelectTone } from '../utils/audio';
 import { ARCHETYPE_PARTS, APERTURE_MATERIALS } from '../data/partCatalog';
 
 export default function ModelViewer3D({
   infrastructure,
-  selectedPartMaterials, // Mapping of partId -> materialId
+  selectedPartMaterials,
   activePartId,
   onSelectPart,
-  materialsList
+  materialsList,
+  isCompact = false
 }) {
   const containerRef = useRef(null);
   const sceneRef = useRef(null);
@@ -20,36 +21,29 @@ export default function ModelViewer3D({
 
   const [isWireframe, setIsWireframe] = useState(false);
   const [isExploded, setIsExploded] = useState(false);
+  const [isIsolatedFocus, setIsIsolatedFocus] = useState(true); // Center Stage Focus mode
   const [sunAngle, setSunAngle] = useState(45);
   const [isAutoRotate, setIsAutoRotate] = useState(false);
   const [hoveredPartName, setHoveredPartName] = useState(null);
 
-  // Combine standard and aperture materials
   const allMaterials = [...materialsList, ...APERTURE_MATERIALS];
-
-  const getMaterialData = (matId) => {
-    return allMaterials.find((m) => m.id === matId) || materialsList[0];
-  };
 
   useEffect(() => {
     if (!containerRef.current) return;
 
     const width = containerRef.current.clientWidth;
-    const height = containerRef.current.clientHeight || 450;
+    const height = containerRef.current.clientHeight || 460;
 
-    // Scene
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0a0a0a);
     scene.fog = new THREE.FogExp2(0x0a0a0a, 0.022);
     sceneRef.current = scene;
 
-    // Camera
-    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 1000);
     camera.position.set(18, 15, 22);
     camera.lookAt(0, 2.5, 0);
     cameraRef.current = camera;
 
-    // Renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -57,7 +51,6 @@ export default function ModelViewer3D({
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     rendererRef.current = renderer;
 
-    // Clear previous canvas
     while (containerRef.current.firstChild) {
       containerRef.current.removeChild(containerRef.current.firstChild);
     }
@@ -76,12 +69,11 @@ export default function ModelViewer3D({
     circleMesh.position.y = 0.01;
     scene.add(circleMesh);
 
-    // Ambient light
+    // Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
     scene.add(ambientLight);
 
-    // Directional Sunlight
-    const sunLight = new THREE.DirectionalLight(0xfff7ea, 1.9);
+    const sunLight = new THREE.DirectionalLight(0xfff7ea, 2.0);
     sunLight.position.set(16, 26, 16);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 1024;
@@ -93,7 +85,6 @@ export default function ModelViewer3D({
     sunLight.shadow.camera.bottom = -d;
     scene.add(sunLight);
 
-    // Rim fill
     const rimLight = new THREE.DirectionalLight(0x4477bb, 0.6);
     rimLight.position.set(-15, 12, -15);
     scene.add(rimLight);
@@ -103,10 +94,9 @@ export default function ModelViewer3D({
     scene.add(rootGroup);
     groupRef.current = rootGroup;
 
-    // Build Model Meshes
     buildArchetypeGeometry(infrastructure, selectedPartMaterials, isWireframe, rootGroup, partMeshesRef);
 
-    // Raycasting for Direct 3D Part Picking
+    // Raycasting for direct part clicking
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
@@ -136,7 +126,7 @@ export default function ModelViewer3D({
         }
       }
 
-      // Check Hover Raycast
+      // Check Hover
       const rect = renderer.domElement.getBoundingClientRect();
       mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
@@ -160,7 +150,6 @@ export default function ModelViewer3D({
     };
 
     const handlePointerUp = (e) => {
-      // If it was a quick tap/click without dragging, trigger part selection!
       if (dragDistance < 8) {
         const clientX = e.clientX || (e.changedTouches && e.changedTouches[0]?.clientX);
         const clientY = e.clientY || (e.changedTouches && e.changedTouches[0]?.clientY);
@@ -197,13 +186,12 @@ export default function ModelViewer3D({
     domElement.addEventListener('touchmove', handlePointerMove, { passive: true });
     window.addEventListener('touchend', handlePointerUp);
 
-    // Animation Loop
     let animationFrameId;
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
 
       if (isAutoRotate && !isDragging && rootGroup) {
-        rootGroup.rotation.y += 0.0025;
+        rootGroup.rotation.y += 0.003;
       }
 
       renderer.render(scene, camera);
@@ -213,7 +201,7 @@ export default function ModelViewer3D({
     const handleResize = () => {
       if (!containerRef.current || !renderer || !camera) return;
       const newWidth = containerRef.current.clientWidth;
-      const newHeight = containerRef.current.clientHeight || 450;
+      const newHeight = containerRef.current.clientHeight || 460;
       camera.aspect = newWidth / newHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(newWidth, newHeight);
@@ -233,13 +221,12 @@ export default function ModelViewer3D({
     };
   }, [infrastructure.id]);
 
-  // Update Geometry and Materials when user changes parts
   useEffect(() => {
     if (!groupRef.current) return;
     buildArchetypeGeometry(infrastructure, selectedPartMaterials, isWireframe, groupRef.current, partMeshesRef);
   }, [selectedPartMaterials, isWireframe, infrastructure]);
 
-  // Handle Pick & Pull Explode Animation
+  // Center Stage Focus & Explode Animation Controller
   useEffect(() => {
     const meshes = partMeshesRef.current;
     if (!meshes) return;
@@ -250,34 +237,64 @@ export default function ModelViewer3D({
 
       const isSelected = partId === activePartId;
 
-      // If exploded mode is on
       if (isExploded) {
+        // Explode Mode: All pieces expand outward
         const offset = partObj.userData?.explodeOffset || { x: 0, y: 0, z: 0 };
-        partObj.position.set(offset.x * 2.0, offset.y * 2.2, offset.z * 2.0);
-      } else if (isSelected) {
-        // "PULL OUT" the selected part slightly for inspection!
-        const pullDir = partObj.userData?.pullDirection || { x: 0, y: 0.8, z: 0 };
-        partObj.position.set(pullDir.x * 0.8, pullDir.y * 0.8, pullDir.z * 0.8);
-      } else {
-        partObj.position.set(0, 0, 0);
-      }
+        partObj.position.set(offset.x * 2.2, offset.y * 2.4, offset.z * 2.2);
+        partObj.scale.set(1, 1, 1);
+        restorePartOpacity(partObj);
 
-      // Highlight active part with emissive glow
-      partObj.traverse((child) => {
-        if (child.isMesh && child.material) {
-          if (isSelected) {
-            child.material.emissive = new THREE.Color(0x334422);
-            child.material.emissiveIntensity = 0.6;
-          } else {
-            child.material.emissive = new THREE.Color(0x000000);
-            child.material.emissiveIntensity = 0;
-          }
+      } else if (isIsolatedFocus && activePartId) {
+        // CENTER STAGE FOCUS MODE
+        if (isSelected) {
+          // Selected part floats forward to center stage and scales slightly up
+          const pullDir = partObj.userData?.pullDirection || { x: 0, y: 1.2, z: 1.5 };
+          partObj.position.set(pullDir.x * 1.8, pullDir.y * 1.6, pullDir.z * 1.8);
+          partObj.scale.set(1.08, 1.08, 1.08);
+
+          partObj.traverse((child) => {
+            if (child.isMesh && child.material) {
+              child.material.transparent = false;
+              child.material.opacity = 1.0;
+              child.material.emissive = new THREE.Color(0x334422);
+              child.material.emissiveIntensity = 0.5;
+            }
+          });
+        } else {
+          // Other parts fade into subtle blueprint ghost
+          partObj.position.set(0, 0, 0);
+          partObj.scale.set(0.98, 0.98, 0.98);
+
+          partObj.traverse((child) => {
+            if (child.isMesh && child.material) {
+              child.material.transparent = true;
+              child.material.opacity = 0.18;
+              child.material.emissive = new THREE.Color(0x000000);
+              child.material.emissiveIntensity = 0;
+            }
+          });
         }
-      });
+      } else {
+        // Standard Full Building View
+        partObj.position.set(0, 0, 0);
+        partObj.scale.set(1, 1, 1);
+        restorePartOpacity(partObj);
+      }
     });
-  }, [activePartId, isExploded]);
+  }, [activePartId, isExploded, isIsolatedFocus]);
 
-  // Geometry Builder
+  function restorePartOpacity(partObj) {
+    partObj.traverse((child) => {
+      if (child.isMesh && child.material) {
+        const isGlass = child.userData?.isGlass;
+        child.material.transparent = isGlass ? true : false;
+        child.material.opacity = isGlass ? 0.45 : 1.0;
+        child.material.emissive = new THREE.Color(0x000000);
+        child.material.emissiveIntensity = 0;
+      }
+    });
+  }
+
   function buildArchetypeGeometry(infra, partConfig, wireframe, parentGroup, partMeshMap) {
     while (parentGroup.children.length > 0) {
       const obj = parentGroup.children[0];
@@ -299,7 +316,7 @@ export default function ModelViewer3D({
       const color = mat ? parseInt(mat.colorHex.replace('#', '0x')) : fallbackColor;
 
       if (isGlass) {
-        return new THREE.MeshPhysicalMaterial({
+        const glassMat = new THREE.MeshPhysicalMaterial({
           color: color,
           transparent: true,
           opacity: matId === 'smart_solar_glass' ? 0.65 : 0.4,
@@ -309,6 +326,8 @@ export default function ModelViewer3D({
           ior: 1.5,
           wireframe: wireframe
         });
+        glassMat.userData = { isGlass: true };
+        return glassMat;
       }
 
       return new THREE.MeshStandardMaterial({
@@ -320,10 +339,10 @@ export default function ModelViewer3D({
       });
     };
 
-    const attachPart = (partId, partName, group, pullDir = { x: 0, y: 0.8, z: 0 }, explodeOffset = { x: 0, y: 0, z: 0 }) => {
+    const attachPart = (partId, partName, group, pullDir = { x: 0, y: 1.0, z: 1.0 }, explodeOffset = { x: 0, y: 0, z: 0 }) => {
       group.userData = { partId, partName, pullDirection: pullDir, explodeOffset: explodeOffset };
       group.traverse((child) => {
-        child.userData = { partId, partName };
+        child.userData = { ...child.userData, partId, partName };
       });
       parentGroup.add(group);
       partMeshMap.current[partId] = group;
@@ -337,7 +356,7 @@ export default function ModelViewer3D({
       plinthMesh.position.y = 0.3;
       plinthMesh.receiveShadow = true;
       baseGroup.add(plinthMesh);
-      attachPart('dome_base', 'SUBGRADE PLINTH', baseGroup, { x: 0, y: -0.8, z: 0 }, { x: 0, y: -2, z: 0 });
+      attachPart('dome_base', 'SUBGRADE PLINTH', baseGroup, { x: 0, y: -1.2, z: 0 }, { x: 0, y: -2.5, z: 0 });
 
       // 2. DOME SHELL
       const shellGroup = new THREE.Group();
@@ -347,7 +366,7 @@ export default function ModelViewer3D({
       domeMesh.castShadow = true;
       domeMesh.receiveShadow = true;
       shellGroup.add(domeMesh);
-      attachPart('dome_shell', 'DOME ENVELOPE SHELL', shellGroup, { x: 0, y: 1.2, z: 0 }, { x: 0, y: 1.5, z: 0 });
+      attachPart('dome_shell', 'DOME ENVELOPE SHELL', shellGroup, { x: 0, y: 1.8, z: 0 }, { x: 0, y: 2.0, z: 0 });
 
       // 3. SKYLIGHT OCULUS
       const oculusGroup = new THREE.Group();
@@ -355,7 +374,7 @@ export default function ModelViewer3D({
       const oculusMesh = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.2, 0.35, 24), oculusMat);
       oculusMesh.position.y = 6.35;
       oculusGroup.add(oculusMesh);
-      attachPart('dome_window_oculus', 'SKYLIGHT OCULUS', oculusGroup, { x: 0, y: 2.0, z: 0 }, { x: 0, y: 4.5, z: 0 });
+      attachPart('dome_window_oculus', 'SKYLIGHT OCULUS', oculusGroup, { x: 0, y: 3.0, z: 0 }, { x: 0, y: 5.5, z: 0 });
 
       // 4. PORTAL TUNNEL
       const portalGroup = new THREE.Group();
@@ -364,7 +383,7 @@ export default function ModelViewer3D({
       portalMesh.position.set(0, 2.0, 5.2);
       portalMesh.castShadow = true;
       portalGroup.add(portalMesh);
-      attachPart('dome_portal_tunnel', 'ENTRANCE TUNNEL', portalGroup, { x: 0, y: 0, z: 2.0 }, { x: 0, y: 0, z: 4.0 });
+      attachPart('dome_portal_tunnel', 'ENTRANCE TUNNEL', portalGroup, { x: 0, y: 0.5, z: 3.5 }, { x: 0, y: 0, z: 4.8 });
 
       // 5. UTILITIES
       const utilGroup = new THREE.Group();
@@ -373,7 +392,7 @@ export default function ModelViewer3D({
       solarMesh.position.set(-4.8, 0.65, -3.8);
       solarMesh.rotation.x = 0.3;
       utilGroup.add(solarMesh);
-      attachPart('dome_utilities', 'OFF-GRID UTILITY POD', utilGroup, { x: -1.5, y: 0, z: -1.5 }, { x: -3.5, y: 0, z: -3.5 });
+      attachPart('dome_utilities', 'OFF-GRID UTILITY POD', utilGroup, { x: -2.5, y: 0, z: -2.5 }, { x: -4.5, y: 0, z: -4.5 });
 
     } else if (infra.id === 'rammed_earth_villa') {
       // 1. FOUNDATION
@@ -382,25 +401,25 @@ export default function ModelViewer3D({
       const fMesh = new THREE.Mesh(new THREE.BoxGeometry(10.5, 0.5, 7.5), fMat);
       fMesh.position.set(0, 0.25, 0);
       fGroup.add(fMesh);
-      attachPart('villa_foundation', 'FOUNDATION SLAB', fGroup, { x: 0, y: -0.8, z: 0 }, { x: 0, y: -2, z: 0 });
+      attachPart('villa_foundation', 'FOUNDATION SLAB', fGroup, { x: 0, y: -1.2, z: 0 }, { x: 0, y: -2.5, z: 0 });
 
-      // 2. SOUTH WALL (Can be swapped to glass or earth!)
+      // 2. SOUTH WALL
       const sGroup = new THREE.Group();
       const sMat = getPartMat('villa_south_wall', 0xA07855);
       const sMesh = new THREE.Mesh(new THREE.BoxGeometry(9.0, 3.8, 0.8), sMat);
       sMesh.position.set(0, 2.4, 3.0);
       sMesh.castShadow = true;
       sGroup.add(sMesh);
-      attachPart('villa_south_wall', 'SOUTH WALL (SWAPPABLE)', sGroup, { x: 0, y: 0, z: 1.8 }, { x: 0, y: 0, z: 3.5 });
+      attachPart('villa_south_wall', 'SOUTH WALL ENVELOPE', sGroup, { x: 0, y: 0.5, z: 3.2 }, { x: 0, y: 0, z: 4.5 });
 
-      // 3. NORTH SHIELD WALL
+      // 3. NORTH WALL
       const nGroup = new THREE.Group();
       const nMat = getPartMat('villa_north_wall', 0xA07855);
       const nMesh = new THREE.Mesh(new THREE.BoxGeometry(9.0, 3.8, 0.8), nMat);
       nMesh.position.set(0, 2.4, -3.0);
       nMesh.castShadow = true;
       nGroup.add(nMesh);
-      attachPart('villa_north_wall', 'NORTH SHIELD WALL', nGroup, { x: 0, y: 0, z: -1.8 }, { x: 0, y: 0, z: -3.5 });
+      attachPart('villa_north_wall', 'NORTH SHIELD WALL', nGroup, { x: 0, y: 0.5, z: -3.2 }, { x: 0, y: 0, z: -4.5 });
 
       // 4. SIDE WALLS
       const sideGroup = new THREE.Group();
@@ -411,24 +430,24 @@ export default function ModelViewer3D({
       westMesh.position.set(-4.1, 2.4, 0);
       sideGroup.add(eastMesh);
       sideGroup.add(westMesh);
-      attachPart('villa_side_walls', 'EAST & WEST SIDE WALLS', sideGroup, { x: 1.5, y: 0, z: 0 }, { x: 3.0, y: 0, z: 0 });
+      attachPart('villa_side_walls', 'EAST & WEST SIDE WALLS', sideGroup, { x: 3.0, y: 0.5, z: 0 }, { x: 4.5, y: 0, z: 0 });
 
-      // 5. CANTILEVERED MASS TIMBER ROOF
+      // 5. ROOF SLAB
       const rGroup = new THREE.Group();
       const rMat = getPartMat('villa_roof_cantilever', 0xC9A066);
       const rMesh = new THREE.Mesh(new THREE.BoxGeometry(11.8, 0.45, 9.0), rMat);
       rMesh.position.set(0, 4.5, 0);
       rMesh.castShadow = true;
       rGroup.add(rMesh);
-      attachPart('villa_roof_cantilever', 'MASS TIMBER ROOF', rGroup, { x: 0, y: 1.8, z: 0 }, { x: 0, y: 3.8, z: 0 });
+      attachPart('villa_roof_cantilever', 'MASS TIMBER ROOF', rGroup, { x: 0, y: 2.8, z: 0 }, { x: 0, y: 4.8, z: 0 });
 
-      // 6. PATIO WINDOW PORTAL
+      // 6. WINDOW PORTAL
       const wGroup = new THREE.Group();
       const wMat = getPartMat('villa_window_portal', 0x68A5BA);
       const wMesh = new THREE.Mesh(new THREE.BoxGeometry(4.0, 3.2, 0.2), wMat);
       wMesh.position.set(0, 2.1, 3.45);
       wGroup.add(wMesh);
-      attachPart('villa_window_portal', 'PATIO WINDOW PORTAL', wGroup, { x: 0, y: 0, z: 1.5 }, { x: 0, y: 0, z: 4.5 });
+      attachPart('villa_window_portal', 'PATIO WINDOW PORTAL', wGroup, { x: 0, y: 0.8, z: 3.5 }, { x: 0, y: 0, z: 5.5 });
 
       // 7. UTILITIES
       const uGroup = new THREE.Group();
@@ -437,10 +456,9 @@ export default function ModelViewer3D({
       sPanels.position.set(0, 4.9, 0);
       sPanels.rotation.x = -0.15;
       uGroup.add(sPanels);
-      attachPart('villa_utilities', 'SOLAR PERGOLA SUITE', uGroup, { x: 0, y: 2.2, z: 0 }, { x: 0, y: 5.5, z: 0 });
+      attachPart('villa_utilities', 'SOLAR PERGOLA SUITE', uGroup, { x: 0, y: 3.2, z: 0 }, { x: 0, y: 6.0, z: 0 });
 
     } else {
-      // GENERIC / MODULAR ARCHETYPES
       const parts = ARCHETYPE_PARTS[infra.id] || ARCHETYPE_PARTS.yzy_mono_dome;
       parts.forEach((p, idx) => {
         const pGroup = new THREE.Group();
@@ -450,26 +468,35 @@ export default function ModelViewer3D({
         mesh.position.y = yPos;
         mesh.castShadow = true;
         pGroup.add(mesh);
-        attachPart(p.id, p.name, pGroup, { x: 0, y: 0.8, z: 0 }, { x: 0, y: idx * 1.5, z: 0 });
+        attachPart(p.id, p.name, pGroup, { x: 0, y: 1.2, z: 1.5 }, { x: 0, y: idx * 1.8, z: 0 });
       });
     }
   }
 
+  // Resize on isCompact change
+  useEffect(() => {
+    if (!containerRef.current || !rendererRef.current || !cameraRef.current) return;
+    const newWidth = containerRef.current.clientWidth;
+    const newHeight = containerRef.current.clientHeight;
+    cameraRef.current.aspect = newWidth / newHeight;
+    cameraRef.current.updateProjectionMatrix();
+    rendererRef.current.setSize(newWidth, newHeight);
+  }, [isCompact]);
+
   return (
-    <div className="relative w-full h-80 sm:h-96 md:h-[500px] bg-yzy-obsidian border border-yzy-slate/70 overflow-hidden flex flex-col select-none">
-      {/* 3D Viewport Canvas */}
+    <div className={`relative w-full transition-all duration-300 ${isCompact ? 'h-52 sm:h-60 md:h-72 shadow-2xl ring-1 ring-yzy-bone/40' : 'h-80 sm:h-96 md:h-[480px]'} bg-yzy-obsidian border border-yzy-slate/70 overflow-hidden flex flex-col select-none`}>
       <div ref={containerRef} className="w-full h-full cursor-grab active:cursor-grabbing touch-none" />
 
       {/* Top Left: Active Part Indicator Badge */}
       <div className="absolute top-3 left-3 flex flex-col gap-1 pointer-events-none">
-        <div className="flex items-center gap-2 bg-yzy-black/85 backdrop-blur-md px-2.5 py-1.5 border border-yzy-bone/40">
+        <div className="flex items-center gap-2 bg-yzy-black/90 backdrop-blur-md px-3 py-1.5 border border-yzy-bone/40 shadow-lg">
           <span className="w-2 h-2 rounded-full bg-yzy-neon animate-pulse" />
           <span className="font-mono text-[10px] sm:text-xs tracking-widest text-white uppercase font-bold">
-            {activePartId ? `INSPECTING: ${activePartId.toUpperCase().replace(/_/g, ' ')}` : 'TAP ANY PART IN 3D TO CUSTOMIZE'}
+            {activePartId ? `CENTER STAGE: ${activePartId.toUpperCase().replace(/_/g, ' ')}` : 'TAP ANY PART IN 3D TO PULL & INSPECT'}
           </span>
         </div>
         {hoveredPartName && (
-          <span className="font-mono text-[9px] text-yzy-ash bg-yzy-black/70 px-2 py-0.5 border border-yzy-slate/60 w-fit">
+          <span className="font-mono text-[9px] text-yzy-ash bg-yzy-black/80 px-2 py-0.5 border border-yzy-slate/60 w-fit">
             HOVER: {hoveredPartName}
           </span>
         )}
@@ -492,43 +519,60 @@ export default function ModelViewer3D({
 
       {/* Bottom Floating Control Bar */}
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 sm:gap-2 bg-yzy-black/90 backdrop-blur-md px-3 py-2 border border-yzy-slate shadow-2xl z-10">
+        {/* Toggle Center Stage Focus Mode */}
+        <button
+          onClick={() => {
+            playTactileClick();
+            setIsIsolatedFocus(!isIsolatedFocus);
+          }}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 font-mono text-[10px] sm:text-xs tracking-wider transition-all ${
+            isIsolatedFocus
+              ? 'bg-yzy-bone text-yzy-black font-bold'
+              : 'text-yzy-chalk hover:text-white hover:bg-yzy-slate/60'
+          }`}
+          title="Pull and isolate the selected part in the center of the screen"
+        >
+          <Focus className="w-3.5 h-3.5" />
+          <span>{isIsolatedFocus ? 'CENTER STAGE ACTIVE' : 'FULL BUILDING VIEW'}</span>
+        </button>
+
+        {/* Explode Mode */}
         <button
           onClick={() => {
             playTactileClick();
             setIsExploded(!isExploded);
           }}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 font-mono text-[10px] sm:text-xs tracking-wider transition-all ${
+          className={`flex items-center gap-1.5 px-2 py-1.5 font-mono text-[10px] sm:text-xs tracking-wider transition-all ${
             isExploded
-              ? 'bg-yzy-bone text-yzy-black font-bold'
+              ? 'bg-yzy-neon text-yzy-black font-bold'
               : 'text-yzy-chalk hover:text-white hover:bg-yzy-slate/60'
           }`}
         >
           <Layers className="w-3.5 h-3.5" />
-          <span>{isExploded ? 'COLLAPSE' : 'EXPLODE PARTS'}</span>
+          <span>EXPLODE</span>
         </button>
 
+        {/* Wireframe */}
         <button
           onClick={() => {
             playTactileClick();
             setIsWireframe(!isWireframe);
           }}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 font-mono text-[10px] sm:text-xs tracking-wider transition-all ${
-            isWireframe
-              ? 'bg-yzy-neon text-yzy-black font-bold'
-              : 'text-yzy-chalk hover:text-white hover:bg-yzy-slate/60'
+          className={`px-2 py-1.5 font-mono text-[10px] transition-all ${
+            isWireframe ? 'text-yzy-neon font-bold bg-yzy-slate/60' : 'text-yzy-ash hover:text-white'
           }`}
         >
-          <Box className="w-3.5 h-3.5" />
-          <span>WIREFRAME</span>
+          CAD
         </button>
 
+        {/* Turntable */}
         <button
           onClick={() => {
             playTactileClick();
             setIsAutoRotate(!isAutoRotate);
           }}
           className={`px-2 py-1.5 font-mono text-[10px] transition-all ${
-            isAutoRotate ? 'text-yzy-bone bg-yzy-slate/60' : 'text-yzy-ash hover:text-yzy-bone'
+            isAutoRotate ? 'text-white' : 'text-yzy-ash hover:text-white'
           }`}
         >
           <RotateCcw className={`w-3.5 h-3.5 ${isAutoRotate ? 'animate-spin' : ''}`} style={{ animationDuration: '10s' }} />
