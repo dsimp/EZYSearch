@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { INFRASTRUCTURES } from './data/infrastructures';
 import { MATERIALS, UTILITY_PACKAGES } from './data/materials';
 import { ARCHETYPE_PARTS, APERTURE_MATERIALS } from './data/partCatalog';
