@@ -37,7 +37,7 @@ export default function InteractiveMatrixHUD({
   );
 
   return (
-    <div className="flex flex-col gap-3 bg-yzy-obsidian border border-yzy-bone/40 p-3 sm:p-5 shadow-2xl">
+    <div id="materials-matrix-section" className="flex flex-col gap-3 bg-yzy-obsidian border border-yzy-bone/40 p-3 sm:p-5 shadow-2xl">
       {/* 1. Sleek Part Selector Bar */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
         {parts.map((p) => {

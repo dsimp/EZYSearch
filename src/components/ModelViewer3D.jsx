@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Layers, Sun, Box, RotateCcw, Focus, AlertCircle } from 'lucide-react';
+import { Layers, Sun, Box, RotateCcw, Focus, AlertCircle, ChevronDown } from 'lucide-react';
 import { playTactileClick, playSelectTone } from '../utils/audio';
 import { ARCHETYPE_PARTS, APERTURE_MATERIALS } from '../data/partCatalog';
 
@@ -33,16 +33,16 @@ export default function ModelViewer3D({
 
     try {
       const width = containerRef.current.clientWidth || 360;
-      const height = containerRef.current.clientHeight || 420;
+      const height = containerRef.current.clientHeight || 360;
 
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x0a0a0a);
-      scene.fog = new THREE.FogExp2(0x0a0a0a, 0.022);
+      scene.background = new THREE.Color(0x080808);
+      scene.fog = new THREE.FogExp2(0x080808, 0.02);
       sceneRef.current = scene;
 
-      const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 1000);
-      camera.position.set(18, 15, 22);
-      camera.lookAt(0, 2.5, 0);
+      const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 1000);
+      camera.position.set(18, 14, 22);
+      camera.lookAt(0, 2.2, 0);
       cameraRef.current = camera;
 
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -57,30 +57,29 @@ export default function ModelViewer3D({
       }
       containerRef.current.appendChild(renderer.domElement);
 
-      // Grid Floor
-      const gridHelper = new THREE.GridHelper(40, 40, 0x333333, 0x181818);
+      // Architectural Ground Plinth & Subtle Grid
+      const gridHelper = new THREE.GridHelper(36, 36, 0x2e2e2e, 0x141414);
       gridHelper.position.y = -0.01;
       scene.add(gridHelper);
 
-      // Polar Rings
       const circleGeo = new THREE.RingGeometry(11.9, 12, 48);
-      const circleMat = new THREE.MeshBasicMaterial({ color: 0x2a2a2a, side: THREE.DoubleSide });
+      const circleMat = new THREE.MeshBasicMaterial({ color: 0x222222, side: THREE.DoubleSide });
       const circleMesh = new THREE.Mesh(circleGeo, circleMat);
       circleMesh.rotation.x = Math.PI / 2;
       circleMesh.position.y = 0.01;
       scene.add(circleMesh);
 
-      // Lighting
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+      // Studio Lighting
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
       scene.add(ambientLight);
 
-      const sunLight = new THREE.DirectionalLight(0xfff7ea, 2.0);
+      const sunLight = new THREE.DirectionalLight(0xfff5e6, 2.2);
       sunLight.position.set(16, 26, 16);
       sunLight.castShadow = true;
       scene.add(sunLight);
 
-      const rimLight = new THREE.DirectionalLight(0x4477bb, 0.6);
-      rimLight.position.set(-15, 12, -15);
+      const rimLight = new THREE.DirectionalLight(0x4477bb, 0.7);
+      rimLight.position.set(-16, 12, -16);
       scene.add(rimLight);
 
       // Main Archetype Model Group
@@ -90,42 +89,61 @@ export default function ModelViewer3D({
 
       buildArchetypeGeometry(infrastructure, selectedPartMaterials, isWireframe, rootGroup, partMeshesRef);
 
-      // Raycasting for direct part clicking
+      // Smart Gesture Disambiguation (Allows natural vertical page scroll while enabling horizontal 3D orbit)
       const raycaster = new THREE.Raycaster();
       const mouse = new THREE.Vector2();
 
       let isDragging = false;
-      let dragDistance = 0;
-      let previousMousePosition = { x: 0, y: 0 };
+      let isHorizontalOrbit = false;
+      let startPos = { x: 0, y: 0 };
+      let previousPos = { x: 0, y: 0 };
+      let totalDragDist = 0;
 
       const handlePointerDown = (e) => {
         isDragging = true;
-        dragDistance = 0;
-        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-        const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-        previousMousePosition = { x: clientX, y: clientY };
+        isHorizontalOrbit = false;
+        totalDragDist = 0;
+        const touch = e.touches && e.touches.length > 0 ? e.touches[0] : null;
+        const clientX = touch ? touch.clientX : e.clientX;
+        const clientY = touch ? touch.clientY : e.clientY;
+        if (clientX !== undefined && clientY !== undefined) {
+          startPos = { x: clientX, y: clientY };
+          previousPos = { x: clientX, y: clientY };
+        }
       };
 
       const handlePointerMove = (e) => {
-        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-        const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+        if (!isDragging) return;
+        const touch = e.touches && e.touches.length > 0 ? e.touches[0] : null;
+        const clientX = touch ? touch.clientX : e.clientX;
+        const clientY = touch ? touch.clientY : e.clientY;
+        if (clientX === undefined || clientY === undefined) return;
 
-        if (isDragging) {
-          const deltaX = clientX - previousMousePosition.x;
-          const deltaY = clientY - previousMousePosition.y;
-          dragDistance += Math.abs(deltaX) + Math.abs(deltaY);
+        const deltaX = clientX - previousPos.x;
+        const deltaY = clientY - previousPos.y;
+        totalDragDist += Math.abs(deltaX) + Math.abs(deltaY);
 
-          if (rootGroup) {
-            rootGroup.rotation.y += deltaX * 0.008;
-          }
+        // Determine if horizontal orbit gesture is dominant
+        const diffX = Math.abs(clientX - startPos.x);
+        const diffY = Math.abs(clientY - startPos.y);
+
+        if (diffX > 6 && diffX > diffY * 1.2) {
+          isHorizontalOrbit = true;
         }
-        previousMousePosition = { x: clientX, y: clientY };
+
+        if (isHorizontalOrbit && rootGroup) {
+          rootGroup.rotation.y += deltaX * 0.009;
+        }
+
+        previousPos = { x: clientX, y: clientY };
       };
 
       const handlePointerUp = (e) => {
-        if (dragDistance < 8 && renderer && renderer.domElement) {
-          const clientX = e.clientX || (e.changedTouches && e.changedTouches[0]?.clientX);
-          const clientY = e.clientY || (e.changedTouches && e.changedTouches[0]?.clientY);
+        // Quick tap without dragging -> Raycast part selection!
+        if (totalDragDist < 10 && renderer && renderer.domElement && rootGroup) {
+          const touch = e.changedTouches && e.changedTouches.length > 0 ? e.changedTouches[0] : null;
+          const clientX = touch ? touch.clientX : e.clientX;
+          const clientY = touch ? touch.clientY : e.clientY;
 
           if (clientX !== undefined && clientY !== undefined) {
             const rect = renderer.domElement.getBoundingClientRect();
@@ -148,6 +166,7 @@ export default function ModelViewer3D({
           }
         }
         isDragging = false;
+        isHorizontalOrbit = false;
       };
 
       const domElement = renderer.domElement;
@@ -155,6 +174,7 @@ export default function ModelViewer3D({
       domElement.addEventListener('mousemove', handlePointerMove);
       window.addEventListener('mouseup', handlePointerUp);
 
+      // Use passive: true so vertical page swipes are NEVER blocked on mobile!
       domElement.addEventListener('touchstart', handlePointerDown, { passive: true });
       domElement.addEventListener('touchmove', handlePointerMove, { passive: true });
       window.addEventListener('touchend', handlePointerUp);
@@ -174,7 +194,7 @@ export default function ModelViewer3D({
       const handleResize = () => {
         if (!containerRef.current || !renderer || !camera) return;
         const newWidth = containerRef.current.clientWidth;
-        const newHeight = containerRef.current.clientHeight || 420;
+        const newHeight = containerRef.current.clientHeight || 360;
         camera.aspect = newWidth / newHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(newWidth, newHeight);
@@ -267,7 +287,7 @@ export default function ModelViewer3D({
     });
   }
 
-  // 6 UNIQUE ARCHITECTURAL 3D PROCEDURAL GEOMETRIES
+  // 6 PHENOMENAL, HYPER-DISTINCT ARCHITECTURAL 3D PROCEDURAL GEOMETRIES
   function buildArchetypeGeometry(infra, partConfig, wireframe, parentGroup, partMeshMap) {
     while (parentGroup.children.length > 0) {
       const obj = parentGroup.children[0];
@@ -292,7 +312,7 @@ export default function ModelViewer3D({
         const glassMat = new THREE.MeshStandardMaterial({
           color: color,
           transparent: true,
-          opacity: matId === 'smart_solar_glass' ? 0.65 : 0.4,
+          opacity: matId === 'smart_solar_glass' ? 0.65 : 0.45,
           roughness: 0.1,
           metalness: 0.2,
           wireframe: wireframe
@@ -320,34 +340,33 @@ export default function ModelViewer3D({
     };
 
     if (infra.id === 'yzy_mono_dome') {
-      // 1. DOME BASE
+      // 1. YZY MONO DOME (CURVED CATENARY SHELL + TUNNEL PORTAL)
+      // BASE PLINTH
       const baseGroup = new THREE.Group();
       const baseMat = getPartMat('dome_base', 0x777777);
-      const plinthMesh = new THREE.Mesh(new THREE.CylinderGeometry(6.4, 6.7, 0.6, 32), baseMat);
+      const plinthMesh = new THREE.Mesh(new THREE.CylinderGeometry(6.4, 6.8, 0.6, 32), baseMat);
       plinthMesh.position.y = 0.3;
-      plinthMesh.receiveShadow = true;
       baseGroup.add(plinthMesh);
       attachPart('dome_base', 'SUBGRADE PLINTH', baseGroup, { x: 0, y: -1.2, z: 0 }, { x: 0, y: -2.5, z: 0 });
 
-      // 2. DOME SHELL
+      // DOME SHELL
       const shellGroup = new THREE.Group();
       const shellMat = getPartMat('dome_shell', 0xDDDDC0);
       const domeMesh = new THREE.Mesh(new THREE.SphereGeometry(5.8, 32, 24, 0, Math.PI * 2, 0, Math.PI / 2), shellMat);
       domeMesh.position.y = 0.6;
       domeMesh.castShadow = true;
-      domeMesh.receiveShadow = true;
       shellGroup.add(domeMesh);
       attachPart('dome_shell', 'DOME ENVELOPE SHELL', shellGroup, { x: 0, y: 1.8, z: 0 }, { x: 0, y: 2.0, z: 0 });
 
-      // 3. SKYLIGHT OCULUS
+      // SKYLIGHT OCULUS
       const oculusGroup = new THREE.Group();
       const oculusMat = getPartMat('dome_window_oculus', 0x68A5BA);
-      const oculusMesh = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.2, 0.35, 24), oculusMat);
+      const oculusMesh = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.3, 0.4, 24), oculusMat);
       oculusMesh.position.y = 6.35;
       oculusGroup.add(oculusMesh);
       attachPart('dome_window_oculus', 'SKYLIGHT OCULUS', oculusGroup, { x: 0, y: 3.0, z: 0 }, { x: 0, y: 5.5, z: 0 });
 
-      // 4. PORTAL TUNNEL
+      // ENTRANCE TUNNEL
       const portalGroup = new THREE.Group();
       const portalMat = getPartMat('dome_portal_tunnel', 0xA07855);
       const portalMesh = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.2, 3.8), portalMat);
@@ -356,9 +375,9 @@ export default function ModelViewer3D({
       portalGroup.add(portalMesh);
       attachPart('dome_portal_tunnel', 'ENTRANCE TUNNEL', portalGroup, { x: 0, y: 0.5, z: 3.5 }, { x: 0, y: 0, z: 4.8 });
 
-      // 5. UTILITIES
+      // UTILITIES
       const utilGroup = new THREE.Group();
-      const utilMat = new THREE.MeshStandardMaterial({ color: 0x1a237e, metalness: 0.8, roughness: 0.2 });
+      const utilMat = new THREE.MeshStandardMaterial({ color: 0x1a237e, metalness: 0.8 });
       const solarMesh = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.1, 1.8), utilMat);
       solarMesh.position.set(-4.8, 0.65, -3.8);
       solarMesh.rotation.x = 0.3;
@@ -366,7 +385,8 @@ export default function ModelViewer3D({
       attachPart('dome_utilities', 'OFF-GRID UTILITY POD', utilGroup, { x: -2.5, y: 0, z: -2.5 }, { x: -4.5, y: 0, z: -4.5 });
 
     } else if (infra.id === 'rammed_earth_villa') {
-      // 1. FOUNDATION
+      // 2. MONOLITHIC EARTH VILLA (CANTILEVER ROOF + PANORAMIC GLASS SLIDER)
+      // FOUNDATION SLAB
       const fGroup = new THREE.Group();
       const fMat = getPartMat('villa_foundation', 0x7A7A78);
       const fMesh = new THREE.Mesh(new THREE.BoxGeometry(11.0, 0.5, 8.0), fMat);
@@ -374,7 +394,7 @@ export default function ModelViewer3D({
       fGroup.add(fMesh);
       attachPart('villa_foundation', 'FOUNDATION SLAB', fGroup, { x: 0, y: -1.2, z: 0 }, { x: 0, y: -2.5, z: 0 });
 
-      // 2. SOUTH WALL
+      // SOUTH WALL
       const sGroup = new THREE.Group();
       const sMat = getPartMat('villa_south_wall', 0xA07855);
       const sMesh = new THREE.Mesh(new THREE.BoxGeometry(9.4, 3.8, 0.8), sMat);
@@ -383,7 +403,7 @@ export default function ModelViewer3D({
       sGroup.add(sMesh);
       attachPart('villa_south_wall', 'SOUTH WALL ENVELOPE', sGroup, { x: 0, y: 0.5, z: 3.2 }, { x: 0, y: 0, z: 4.5 });
 
-      // 3. NORTH WALL
+      // NORTH WALL
       const nGroup = new THREE.Group();
       const nMat = getPartMat('villa_north_wall', 0xA07855);
       const nMesh = new THREE.Mesh(new THREE.BoxGeometry(9.4, 3.8, 0.8), nMat);
@@ -392,7 +412,7 @@ export default function ModelViewer3D({
       nGroup.add(nMesh);
       attachPart('villa_north_wall', 'NORTH SHIELD WALL', nGroup, { x: 0, y: 0.5, z: -3.2 }, { x: 0, y: 0, z: -4.5 });
 
-      // 4. SIDE WALLS
+      // SIDE WALLS
       const sideGroup = new THREE.Group();
       const sideMat = getPartMat('villa_side_walls', 0xA07855);
       const eastMesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 3.8, 5.6), sideMat);
@@ -403,7 +423,7 @@ export default function ModelViewer3D({
       sideGroup.add(westMesh);
       attachPart('villa_side_walls', 'EAST & WEST SIDE WALLS', sideGroup, { x: 3.0, y: 0.5, z: 0 }, { x: 4.5, y: 0, z: 0 });
 
-      // 5. ROOF SLAB
+      // CANTILEVER ROOF
       const rGroup = new THREE.Group();
       const rMat = getPartMat('villa_roof_cantilever', 0xC9A066);
       const rMesh = new THREE.Mesh(new THREE.BoxGeometry(12.4, 0.45, 9.4), rMat);
@@ -412,7 +432,7 @@ export default function ModelViewer3D({
       rGroup.add(rMesh);
       attachPart('villa_roof_cantilever', 'MASS TIMBER ROOF', rGroup, { x: 0, y: 2.8, z: 0 }, { x: 0, y: 4.8, z: 0 });
 
-      // 6. WINDOW PORTAL
+      // WINDOW PORTAL
       const wGroup = new THREE.Group();
       const wMat = getPartMat('villa_window_portal', 0x68A5BA);
       const wMesh = new THREE.Mesh(new THREE.BoxGeometry(4.5, 3.2, 0.2), wMat);
@@ -420,9 +440,9 @@ export default function ModelViewer3D({
       wGroup.add(wMesh);
       attachPart('villa_window_portal', 'PATIO WINDOW PORTAL', wGroup, { x: 0, y: 0.8, z: 3.5 }, { x: 0, y: 0, z: 5.5 });
 
-      // 7. UTILITIES
+      // UTILITIES
       const uGroup = new THREE.Group();
-      const uMat = new THREE.MeshStandardMaterial({ color: 0x1a237e, metalness: 0.8, roughness: 0.2 });
+      const uMat = new THREE.MeshStandardMaterial({ color: 0x1a237e, metalness: 0.8 });
       const sPanels = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.1, 3.4), uMat);
       sPanels.position.set(0, 4.9, 0);
       sPanels.rotation.x = -0.15;
@@ -430,8 +450,7 @@ export default function ModelViewer3D({
       attachPart('villa_utilities', 'SOLAR PERGOLA SUITE', uGroup, { x: 0, y: 3.2, z: 0 }, { x: 0, y: 6.0, z: 0 });
 
     } else if (infra.id === 'modular_eco_apartments') {
-      // 3-STORY MODULAR COMMUNE BLOCK
-      // 1. BASE PODIUM
+      // 3. MODULAR COMMUNE BLOCK (STACKED 3-TIER APARTMENTS + BALCONIES)
       const baseGroup = new THREE.Group();
       const baseMat = getPartMat('mod_pod_base', 0x777777);
       const podium = new THREE.Mesh(new THREE.BoxGeometry(9.0, 0.8, 9.0), baseMat);
@@ -439,7 +458,6 @@ export default function ModelViewer3D({
       baseGroup.add(podium);
       attachPart('mod_pod_base', 'PODIUM SUBGRADE', baseGroup, { x: 0, y: -1.2, z: 0 }, { x: 0, y: -2.5, z: 0 });
 
-      // 2. TIER 1 MODULES
       const t1Group = new THREE.Group();
       const t1Mat = getPartMat('mod_tier1_modules', 0xA07855);
       const m1A = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.2, 7.6), t1Mat);
@@ -450,7 +468,6 @@ export default function ModelViewer3D({
       t1Group.add(m1B);
       attachPart('mod_tier1_modules', 'LEVEL 01 LIVING MODULES', t1Group, { x: -2.0, y: 0.5, z: 0 }, { x: -3.5, y: 0, z: 0 });
 
-      // 3. TIER 2 MODULES
       const t2Group = new THREE.Group();
       const t2Mat = getPartMat('mod_tier2_modules', 0xC9A066);
       const m2 = new THREE.Mesh(new THREE.BoxGeometry(7.8, 2.2, 3.8), t2Mat);
@@ -458,7 +475,6 @@ export default function ModelViewer3D({
       t2Group.add(m2);
       attachPart('mod_tier2_modules', 'LEVEL 02 LIVING MODULES', t2Group, { x: 2.0, y: 0.5, z: 0 }, { x: 3.5, y: 0, z: 0 });
 
-      // 4. TIER 3 PENTHOUSE MODULES
       const t3Group = new THREE.Group();
       const t3Mat = getPartMat('mod_tier3_modules', 0xC9A066);
       const m3 = new THREE.Mesh(new THREE.BoxGeometry(4.8, 2.2, 4.8), t3Mat);
@@ -466,7 +482,6 @@ export default function ModelViewer3D({
       t3Group.add(m3);
       attachPart('mod_tier3_modules', 'LEVEL 03 PENTHOUSE', t3Group, { x: 0, y: 1.8, z: -1.5 }, { x: 0, y: 3.0, z: -3.0 });
 
-      // 5. FACADE GLAZING
       const gGroup = new THREE.Group();
       const gMat = getPartMat('mod_facade_glazing', 0x68A5BA);
       const gMesh = new THREE.Mesh(new THREE.BoxGeometry(7.2, 1.4, 0.2), gMat);
@@ -474,7 +489,6 @@ export default function ModelViewer3D({
       gGroup.add(gMesh);
       attachPart('mod_facade_glazing', 'COURTYARD GLAZING', gGroup, { x: 0, y: 0.5, z: 3.0 }, { x: 0, y: 0, z: 4.8 });
 
-      // 6. ROOFTOP CANOPY
       const cGroup = new THREE.Group();
       const cMat = getPartMat('mod_roof_canopy', 0xC9A066);
       const canopy = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.2, 5.6), cMat);
@@ -482,7 +496,6 @@ export default function ModelViewer3D({
       cGroup.add(canopy);
       attachPart('mod_roof_canopy', 'COMMUNAL ROOFTOP CANOPY', cGroup, { x: 0, y: 2.5, z: 0 }, { x: 0, y: 4.5, z: 0 });
 
-      // 7. UTILITIES
       const uGroup = new THREE.Group();
       const uMat = new THREE.MeshStandardMaterial({ color: 0x1a237e, metalness: 0.8 });
       const uMesh = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.2, 2.0), uMat);
@@ -491,8 +504,7 @@ export default function ModelViewer3D({
       attachPart('mod_utilities', 'DISTRICT MICROGRID', uGroup, { x: -2.5, y: 0, z: -2.5 }, { x: -4.0, y: 0, z: -4.0 });
 
     } else if (infra.id === 'donda_resilience_commons') {
-      // DONDA VILLAGE ECOSYSTEM (CENTRAL BIODOME + SATELLITE DOMES RING)
-      // 1. PLAZA BASE
+      // 4. DONDA RESILIENCE COMMONS (CENTRAL BIODOME + 6 SATELLITE DOMES)
       const pGroup = new THREE.Group();
       const pMat = getPartMat('donda_base_plaza', 0x777777);
       const plaza = new THREE.Mesh(new THREE.CylinderGeometry(9.2, 9.6, 0.4, 32), pMat);
@@ -500,7 +512,6 @@ export default function ModelViewer3D({
       pGroup.add(plaza);
       attachPart('donda_base_plaza', 'COMMUNAL PLAZA BASE', pGroup, { x: 0, y: -1.2, z: 0 }, { x: 0, y: -2.5, z: 0 });
 
-      // 2. CENTRAL BIODOME
       const cbGroup = new THREE.Group();
       const cbMat = getPartMat('donda_central_dome', 0xDDDDC0);
       const centralDome = new THREE.Mesh(new THREE.SphereGeometry(3.6, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2), cbMat);
@@ -508,7 +519,6 @@ export default function ModelViewer3D({
       cbGroup.add(centralDome);
       attachPart('donda_central_dome', 'CENTRAL BIODOME', cbGroup, { x: 0, y: 2.2, z: 0 }, { x: 0, y: 3.5, z: 0 });
 
-      // 3. SATELLITE RESIDENTIAL DOMES (6 Pods Ring)
       const podsGroup = new THREE.Group();
       const podMat = getPartMat('donda_living_pods', 0xA07855);
       for (let i = 0; i < 6; i++) {
@@ -522,7 +532,6 @@ export default function ModelViewer3D({
       }
       attachPart('donda_living_pods', 'SATELLITE DOMES (6 PODS)', podsGroup, { x: 0, y: 1.0, z: 2.5 }, { x: 0, y: 1.5, z: 3.5 });
 
-      // 4. PERGOLA RING
       const rGroup = new THREE.Group();
       const rMat = getPartMat('donda_pergola_ring', 0xC49A45);
       const ringMesh = new THREE.Mesh(new THREE.TorusGeometry(6.2, 0.25, 8, 32), rMat);
@@ -531,7 +540,6 @@ export default function ModelViewer3D({
       rGroup.add(ringMesh);
       attachPart('donda_pergola_ring', 'RAIN HARVESTING RING', rGroup, { x: 0, y: 2.8, z: 0 }, { x: 0, y: 4.5, z: 0 });
 
-      // 5. MICROGRID
       const mGroup = new THREE.Group();
       const mMat = new THREE.MeshStandardMaterial({ color: 0x1a237e, metalness: 0.8 });
       const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 5.5, 8), mMat);
@@ -540,8 +548,7 @@ export default function ModelViewer3D({
       attachPart('donda_microgrid', 'CITY MICRO-GRID', mGroup, { x: 0, y: 3.5, z: 0 }, { x: 0, y: 5.5, z: 0 });
 
     } else if (infra.id === 'rapid_emergency_pod') {
-      // RAPID EMERGENCY ORIGAMI POD
-      // 1. BASE CHASSIS
+      // 5. RAPID EMERGENCY POD (ANGLED ORIGAMI CAPSULE)
       const chGroup = new THREE.Group();
       const chMat = getPartMat('pod_base_chassis', 0x2E4057);
       const chassis = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.5, 4.8), chMat);
@@ -549,7 +556,6 @@ export default function ModelViewer3D({
       chGroup.add(chassis);
       attachPart('pod_base_chassis', 'ELEVATED BASE PLINTH', chGroup, { x: 0, y: -1.0, z: 0 }, { x: 0, y: -2.0, z: 0 });
 
-      // 2. BIO WALLS
       const wGroup = new THREE.Group();
       const wMat = getPartMat('pod_bio_walls', 0x2E4057);
       const cabin = new THREE.Mesh(new THREE.BoxGeometry(4.2, 2.8, 4.2), wMat);
@@ -557,7 +563,6 @@ export default function ModelViewer3D({
       wGroup.add(cabin);
       attachPart('pod_bio_walls', 'FLATPACK BIO-WALLS', wGroup, { x: 0, y: 0.8, z: 1.8 }, { x: 0, y: 0, z: 3.5 });
 
-      // 3. ORIGAMI ROOF
       const rfGroup = new THREE.Group();
       const rfMat = getPartMat('pod_origami_roof', 0x8E8E89);
       const roof = new THREE.Mesh(new THREE.ConeGeometry(3.6, 2.0, 4), rfMat);
@@ -566,7 +571,6 @@ export default function ModelViewer3D({
       rfGroup.add(roof);
       attachPart('pod_origami_roof', 'ANGLED ORIGAMI ROOF', rfGroup, { x: 0, y: 2.2, z: 0 }, { x: 0, y: 4.0, z: 0 });
 
-      // 4. GLAZING PORTS
       const glGroup = new THREE.Group();
       const glMat = getPartMat('pod_glazing', 0x68A5BA);
       const port = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.8, 0.2), glMat);
@@ -574,7 +578,6 @@ export default function ModelViewer3D({
       glGroup.add(port);
       attachPart('pod_glazing', 'LIGHT PORTS', glGroup, { x: 0, y: 0.5, z: 2.5 }, { x: 0, y: 0, z: 4.5 });
 
-      // 5. SOLAR KIT
       const skGroup = new THREE.Group();
       const skMat = new THREE.MeshStandardMaterial({ color: 0x1a237e, metalness: 0.8 });
       const panel = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.08, 1.4), skMat);
@@ -584,8 +587,7 @@ export default function ModelViewer3D({
       attachPart('pod_utility_kit', '12V EMERGENCY SOLAR KIT', skGroup, { x: 0, y: 2.0, z: 2.0 }, { x: 0, y: 3.5, z: 3.5 });
 
     } else if (infra.id === 'terrace_earth_apartments') {
-      // STEPPED EARTH ZIGGURAT TERRACE COMPLEX
-      // 1. ZIGGURAT BEDROCK BASE
+      // 6. STEPPED EARTH TERRACE COMPLEX (3-TIER ZIGGURAT WITH GARDEN DECKS)
       const bGroup = new THREE.Group();
       const bMat = getPartMat('terrace_foundation', 0x777777);
       const base = new THREE.Mesh(new THREE.BoxGeometry(11.0, 0.6, 10.0), bMat);
@@ -593,7 +595,6 @@ export default function ModelViewer3D({
       bGroup.add(base);
       attachPart('terrace_foundation', 'ZIGGURAT BASE PLINTH', bGroup, { x: 0, y: -1.2, z: 0 }, { x: 0, y: -2.5, z: 0 });
 
-      // 2. STEPPED RESIDENTIAL WALL MATRIX
       const wGroup = new THREE.Group();
       const wMat = getPartMat('terrace_tier_walls', 0x8B9574);
       const tier1 = new THREE.Mesh(new THREE.BoxGeometry(9.6, 2.2, 8.4), wMat);
@@ -607,7 +608,6 @@ export default function ModelViewer3D({
       wGroup.add(tier3);
       attachPart('terrace_tier_walls', 'STEPPED WALL MATRIX', wGroup, { x: 0, y: 0.8, z: 2.5 }, { x: 0, y: 0, z: 4.5 });
 
-      // 3. CASCADING GREEN ROOF TERRACES
       const gGroup = new THREE.Group();
       const gMat = getPartMat('terrace_garden_roofs', 0xC9A066);
       const deck1 = new THREE.Mesh(new THREE.BoxGeometry(9.8, 0.25, 2.4), gMat);
@@ -618,7 +618,6 @@ export default function ModelViewer3D({
       gGroup.add(deck2);
       attachPart('terrace_garden_roofs', 'CASCADING GARDEN DECKS', gGroup, { x: 0, y: 2.2, z: 0 }, { x: 0, y: 4.0, z: 0 });
 
-      // 4. PANORAMIC TERRACE GLAZING PORTALS
       const pzGroup = new THREE.Group();
       const pzMat = getPartMat('terrace_panoramic_windows', 0x68A5BA);
       const win1 = new THREE.Mesh(new THREE.BoxGeometry(8.0, 1.4, 0.2), pzMat);
@@ -629,7 +628,6 @@ export default function ModelViewer3D({
       pzGroup.add(win2);
       attachPart('terrace_panoramic_windows', 'TERRACE GLAZING PORTALS', pzGroup, { x: 0, y: 0.5, z: 3.5 }, { x: 0, y: 0, z: 5.5 });
 
-      // 5. CENTRALIZED ECO-GRID
       const egGroup = new THREE.Group();
       const egMat = new THREE.MeshStandardMaterial({ color: 0x1a237e, metalness: 0.8 });
       const solarCanopy = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.15, 3.8), egMat);
@@ -648,34 +646,42 @@ export default function ModelViewer3D({
     rendererRef.current.setSize(newWidth, newHeight);
   }, [isCompact]);
 
+  const scrollToMaterials = () => {
+    playTactileClick();
+    const el = document.getElementById('materials-matrix-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   if (webglError) {
     return (
-      <div className="w-full h-72 bg-yzy-obsidian border border-yzy-slate flex flex-col items-center justify-center p-6 text-center font-mono">
+      <div className="w-full h-60 bg-yzy-obsidian border border-yzy-slate flex flex-col items-center justify-center p-6 text-center font-mono">
         <AlertCircle className="w-8 h-8 text-yzy-warning mb-2" />
-        <span className="font-bold text-white text-sm uppercase">2D ARCHITECTURAL MODE ACTIVE</span>
+        <span className="font-bold text-white text-sm uppercase">2D ARCHITECTURAL MODE</span>
         <span className="text-xs text-yzy-ash max-w-sm mt-1">
-          Select materials in the matrix below to customize the build.
+          Scroll down to customize materials.
         </span>
       </div>
     );
   }
 
   return (
-    <div className={`relative w-full transition-all duration-300 ${isCompact ? 'h-52 sm:h-60 md:h-72 shadow-2xl ring-1 ring-yzy-bone/40' : 'h-80 sm:h-96 md:h-[480px]'} bg-yzy-obsidian border border-yzy-slate/70 overflow-hidden flex flex-col select-none`}>
-      <div ref={containerRef} className="w-full h-full cursor-grab active:cursor-grabbing touch-none" />
+    <div className={`relative w-full transition-all duration-300 ${isCompact ? 'h-44 sm:h-52 md:h-64 shadow-2xl ring-1 ring-yzy-bone/40' : 'h-60 sm:h-72 md:h-[440px]'} bg-yzy-obsidian border border-yzy-slate/70 overflow-hidden flex flex-col select-none touch-pan-y`}>
+      <div ref={containerRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
 
       {/* Top Left: Active Part Indicator Badge */}
-      <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 pointer-events-none z-10">
-        <div className="flex items-center gap-1.5 bg-yzy-black/90 backdrop-blur-md px-2.5 py-1 border border-yzy-bone/40 shadow-lg">
-          <span className="w-2 h-2 rounded-full bg-yzy-neon animate-pulse" />
-          <span className="font-mono text-[9px] sm:text-xs tracking-widest text-white uppercase font-bold truncate max-w-[200px] sm:max-w-none">
+      <div className="absolute top-2 left-2 flex flex-col gap-1 pointer-events-none z-10">
+        <div className="flex items-center gap-1.5 bg-yzy-black/90 backdrop-blur-md px-2 py-0.5 border border-yzy-bone/40 shadow-lg">
+          <span className="w-1.5 h-1.5 rounded-full bg-yzy-neon animate-pulse" />
+          <span className="font-mono text-[9px] sm:text-[11px] tracking-widest text-white uppercase font-bold truncate max-w-[170px] sm:max-w-none">
             {activePartId ? activePartId.toUpperCase().replace(/_/g, ' ') : 'TAP 3D TO SELECT'}
           </span>
         </div>
       </div>
 
       {/* Top Right: Sun Azimuth Slider */}
-      <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 bg-yzy-black/85 backdrop-blur-md px-2 py-1 border border-yzy-slate text-[10px] font-mono z-10">
+      <div className="absolute top-2 right-2 flex items-center gap-1 bg-yzy-black/85 backdrop-blur-md px-1.5 py-0.5 border border-yzy-slate text-[9px] font-mono z-10">
         <Sun className="w-3 h-3 text-yzy-warning" />
         <input
           type="range"
@@ -683,19 +689,19 @@ export default function ModelViewer3D({
           max="360"
           value={sunAngle}
           onChange={(e) => setSunAngle(Number(e.target.value))}
-          className="w-14 sm:w-20 h-1 bg-yzy-slate cursor-pointer accent-yzy-bone"
+          className="w-12 sm:w-16 h-1 bg-yzy-slate cursor-pointer accent-yzy-bone"
         />
-        <span className="text-yzy-chalk w-5 text-right text-[9px]">{sunAngle}°</span>
+        <span className="text-yzy-chalk w-4 text-right">{sunAngle}°</span>
       </div>
 
-      {/* Bottom Floating Control Bar */}
-      <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-yzy-black/90 backdrop-blur-md px-2 py-1.5 border border-yzy-slate shadow-2xl z-10">
+      {/* Bottom Control Bar + Quick Scroll Button */}
+      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-yzy-black/90 backdrop-blur-md px-2 py-1 border border-yzy-slate shadow-2xl z-10">
         <button
           onClick={() => {
             playTactileClick();
             setIsIsolatedFocus(!isIsolatedFocus);
           }}
-          className={`flex items-center gap-1 px-2 py-1 font-mono text-[9px] sm:text-xs tracking-wider transition-all ${
+          className={`flex items-center gap-1 px-1.5 py-0.5 font-mono text-[9px] sm:text-xs tracking-wider transition-all ${
             isIsolatedFocus
               ? 'bg-yzy-bone text-yzy-black font-bold'
               : 'text-yzy-chalk hover:text-white'
@@ -710,7 +716,7 @@ export default function ModelViewer3D({
             playTactileClick();
             setIsExploded(!isExploded);
           }}
-          className={`flex items-center gap-1 px-2 py-1 font-mono text-[9px] sm:text-xs tracking-wider transition-all ${
+          className={`flex items-center gap-1 px-1.5 py-0.5 font-mono text-[9px] sm:text-xs tracking-wider transition-all ${
             isExploded
               ? 'bg-yzy-neon text-yzy-black font-bold'
               : 'text-yzy-chalk hover:text-white'
@@ -725,7 +731,7 @@ export default function ModelViewer3D({
             playTactileClick();
             setIsWireframe(!isWireframe);
           }}
-          className={`px-2 py-1 font-mono text-[9px] sm:text-xs transition-all ${
+          className={`px-1.5 py-0.5 font-mono text-[9px] sm:text-xs transition-all ${
             isWireframe ? 'text-yzy-neon font-bold bg-yzy-slate/60' : 'text-yzy-ash hover:text-white'
           }`}
         >
@@ -737,11 +743,20 @@ export default function ModelViewer3D({
             playTactileClick();
             setIsAutoRotate(!isAutoRotate);
           }}
-          className={`px-1.5 py-1 font-mono text-[9px] transition-all ${
+          className={`px-1.5 py-0.5 font-mono text-[9px] transition-all ${
             isAutoRotate ? 'text-white' : 'text-yzy-ash hover:text-white'
           }`}
         >
           <RotateCcw className={`w-3 h-3 ${isAutoRotate ? 'animate-spin' : ''}`} style={{ animationDuration: '10s' }} />
+        </button>
+
+        <button
+          onClick={scrollToMaterials}
+          className="flex items-center gap-0.5 bg-yzy-charcoal hover:bg-yzy-slate text-yzy-neon px-1.5 py-0.5 font-mono text-[9px] border border-yzy-slate/60 ml-1"
+          title="Scroll to Material Swatches"
+        >
+          <span>SWATCHES</span>
+          <ChevronDown className="w-2.5 h-2.5" />
         </button>
       </div>
     </div>
