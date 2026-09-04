@@ -1,5 +1,5 @@
-import React from 'react';
-import { Shield, Clock, Users, Maximize, ArrowRight, Check, Flame, Wind, Activity } from 'lucide-react';
+import React, { useState } from 'react';
+import { Check, ChevronDown, ChevronUp, Info, Wind, Users, Maximize2 } from 'lucide-react';
 import { playTactileClick, playSelectTone } from '../utils/audio';
 
 export default function InfrastructureSelector({
@@ -7,102 +7,106 @@ export default function InfrastructureSelector({
   selectedInfra,
   onSelectInfra
 }) {
-  return (
-    <div className="flex flex-col gap-4">
-      {/* Section Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-1 border-b border-yzy-slate pb-2">
-        <div>
-          <span className="font-mono text-[10px] tracking-widest-xl text-yzy-ash uppercase block">
-            01 // ARCHETYPE SELECTION
-          </span>
-          <h2 className="font-display text-lg sm:text-xl font-bold tracking-tight text-yzy-bone">
-            SELECT INFRASTRUCTURE MATRIX
-          </h2>
-        </div>
-        <span className="font-mono text-[10px] text-yzy-ash">
-          {infrastructures.length} PRODUCTION SCHEMATICS AVAILABLE
-        </span>
-      </div>
+  const [showDetails, setShowDetails] = useState(false);
 
-      {/* Horizontal Scroll on Mobile / Grid on Tablet & Desktop */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+  return (
+    <div className="flex flex-col gap-2">
+      {/* Sleek Horizontal Archetype Switcher Strip */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar">
         {infrastructures.map((infra) => {
           const isSelected = selectedInfra.id === infra.id;
           return (
-            <div
+            <button
               key={infra.id}
               onClick={() => {
                 playSelectTone();
                 onSelectInfra(infra);
               }}
-              className={`group cursor-pointer p-4 border transition-all duration-200 flex flex-col justify-between relative ${
+              className={`shrink-0 px-3.5 py-2 border transition-all text-left flex flex-col justify-between min-w-[135px] sm:min-w-[160px] ${
                 isSelected
-                  ? 'bg-yzy-obsidian border-yzy-bone shadow-lg ring-1 ring-yzy-bone/40'
-                  : 'bg-yzy-obsidian/40 border-yzy-slate/70 hover:border-yzy-ash hover:bg-yzy-obsidian/80'
+                  ? 'bg-yzy-bone text-yzy-black border-yzy-bone shadow-md font-bold'
+                  : 'bg-yzy-obsidian/70 text-yzy-chalk border-yzy-slate hover:border-yzy-ash hover:bg-yzy-charcoal'
               }`}
             >
-              {/* Top Tag & Selection Badge */}
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-mono text-[9px] font-bold tracking-widest text-yzy-ash uppercase">
+              <div className="flex items-center justify-between w-full mb-0.5">
+                <span className={`font-mono text-[9px] uppercase tracking-wider ${
+                  isSelected ? 'text-yzy-black/70' : 'text-yzy-ash'
+                }`}>
                   {infra.code}
                 </span>
-                {isSelected ? (
-                  <span className="flex items-center gap-1 bg-yzy-bone text-yzy-black font-mono text-[9px] font-bold px-2 py-0.5 tracking-wider">
-                    <Check className="w-3 h-3" /> ACTIVE
-                  </span>
-                ) : (
-                  <span className="font-mono text-[9px] text-yzy-ash border border-yzy-slate px-1.5 py-0.5">
-                    {infra.difficulty}
-                  </span>
-                )}
+                {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-yzy-black" />}
               </div>
-
-              {/* Title & Subtitle */}
-              <div>
-                <h3 className="font-display text-base font-bold text-yzy-bone tracking-tight mb-0.5 group-hover:text-white transition-colors">
-                  {infra.name}
-                </h3>
-                <p className="font-mono text-[10px] text-yzy-ash tracking-wide uppercase mb-2">
-                  {infra.subtitle}
-                </p>
-                <p className="text-xs text-yzy-chalk/80 line-clamp-2 leading-relaxed mb-3">
-                  {infra.tagline}
-                </p>
+              <span className="font-display text-xs sm:text-sm font-bold truncate block">
+                {infra.name}
+              </span>
+              <div className="flex items-center justify-between mt-1 font-mono text-[9px]">
+                <span className={isSelected ? 'text-yzy-black/80' : 'text-yzy-ash'}>
+                  {infra.sqft} SQFT
+                </span>
+                <span className={`font-bold ${isSelected ? 'text-yzy-black' : 'text-yzy-neon'}`}>
+                  ${(infra.estimatedCostMin / 1000).toFixed(0)}k+
+                </span>
               </div>
-
-              {/* Specs Matrix */}
-              <div className="grid grid-cols-3 gap-1.5 bg-yzy-black/60 p-2 border border-yzy-slate/60 text-[10px] font-mono mb-3">
-                <div className="flex flex-col">
-                  <span className="text-yzy-ash text-[9px]">AREA</span>
-                  <span className="text-yzy-bone font-bold">{infra.sqft} SQFT</span>
-                </div>
-                <div className="flex flex-col border-l border-yzy-slate/40 pl-2">
-                  <span className="text-yzy-ash text-[9px]">TIMELINE</span>
-                  <span className="text-yzy-bone font-bold">{infra.buildTimeDays} DAYS</span>
-                </div>
-                <div className="flex flex-col border-l border-yzy-slate/40 pl-2">
-                  <span className="text-yzy-ash text-[9px]">OCCUPANCY</span>
-                  <span className="text-yzy-bone font-bold">{infra.occupancy.split(' ')[0]} PPL</span>
-                </div>
-              </div>
-
-              {/* Resilience Badges */}
-              <div className="flex items-center justify-between pt-2 border-t border-yzy-slate/40 text-[10px] font-mono">
-                <div className="flex items-center gap-1 text-yzy-chalk">
-                  <Wind className="w-3 h-3 text-yzy-ash" />
-                  <span>{infra.windResistance.split(' ')[0]} MPH</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-yzy-ash text-[9px] block">EST. BUDGET</span>
-                  <span className="text-yzy-bone font-bold">
-                    ${infra.estimatedCostMin.toLocaleString()} - ${infra.estimatedCostMax.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            </div>
+            </button>
           );
         })}
       </div>
+
+      {/* Minimal Active Archetype Bar with Optional Details Dropdown */}
+      <div className="bg-yzy-obsidian/90 border border-yzy-slate/70 p-2 sm:p-2.5 flex items-center justify-between gap-2 text-xs font-mono">
+        <div className="flex items-center gap-2 truncate">
+          <span className="w-2 h-2 rounded-full bg-yzy-neon shrink-0 animate-pulse" />
+          <span className="font-display font-bold text-white text-xs sm:text-sm uppercase truncate">
+            {selectedInfra.name}
+          </span>
+          <span className="text-yzy-ash text-[10px] hidden sm:inline truncate">
+            // {selectedInfra.subtitle}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0">
+          <span className="text-yzy-neon font-bold text-xs">
+            ${selectedInfra.estimatedCostMin.toLocaleString()} - ${selectedInfra.estimatedCostMax.toLocaleString()}
+          </span>
+          <button
+            onClick={() => {
+              playTactileClick();
+              setShowDetails(!showDetails);
+            }}
+            className="flex items-center gap-1 text-[10px] text-yzy-ash hover:text-white bg-yzy-black px-2 py-1 border border-yzy-slate transition-colors"
+          >
+            <span>{showDetails ? 'HIDE' : 'INTEL'}</span>
+            {showDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Collapsible Deep Specs Box (Hidden by default to keep UI ultra-clean) */}
+      {showDetails && (
+        <div className="bg-yzy-black border border-yzy-slate p-3 sm:p-4 text-xs font-mono flex flex-col gap-2.5 animate-fadeIn">
+          <p className="text-yzy-chalk/90 leading-relaxed text-xs">
+            {selectedInfra.description}
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-yzy-slate/60 text-[10px]">
+            <div>
+              <span className="text-yzy-ash block uppercase">FOOTPRINT</span>
+              <span className="font-bold text-white">{selectedInfra.sqft} SQFT ({selectedInfra.diameter})</span>
+            </div>
+            <div>
+              <span className="text-yzy-ash block uppercase">TIMELINE</span>
+              <span className="font-bold text-white">{selectedInfra.buildTimeDays} DAYS</span>
+            </div>
+            <div>
+              <span className="text-yzy-ash block uppercase">OCCUPANCY</span>
+              <span className="font-bold text-white">{selectedInfra.occupancy}</span>
+            </div>
+            <div>
+              <span className="text-yzy-ash block uppercase">WIND / SEISMIC</span>
+              <span className="font-bold text-yzy-neon">{selectedInfra.windResistance.split(' ')[0]} MPH / {selectedInfra.seismicZone.split(' ')[0]}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

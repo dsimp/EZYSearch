@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Layers, Eye, Sun, Box, RotateCcw, Maximize2, Sparkles, Check, Info, MousePointer, Focus, Scan, AlertCircle } from 'lucide-react';
+import { Layers, Sun, Box, RotateCcw, Focus, AlertCircle } from 'lucide-react';
 import { playTactileClick, playSelectTone } from '../utils/audio';
 import { ARCHETYPE_PARTS, APERTURE_MATERIALS } from '../data/partCatalog';
 
@@ -24,7 +24,6 @@ export default function ModelViewer3D({
   const [isIsolatedFocus, setIsIsolatedFocus] = useState(true);
   const [sunAngle, setSunAngle] = useState(45);
   const [isAutoRotate, setIsAutoRotate] = useState(false);
-  const [hoveredPartName, setHoveredPartName] = useState(null);
   const [webglError, setWebglError] = useState(false);
 
   const allMaterials = [...materialsList, ...APERTURE_MATERIALS];
@@ -120,28 +119,6 @@ export default function ModelViewer3D({
             rootGroup.rotation.y += deltaX * 0.008;
           }
         }
-
-        if (renderer && renderer.domElement) {
-          const rect = renderer.domElement.getBoundingClientRect();
-          mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-          mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-
-          raycaster.setFromCamera(mouse, camera);
-          const intersects = raycaster.intersectObjects(rootGroup.children, true);
-
-          if (intersects.length > 0) {
-            let topMesh = intersects[0].object;
-            while (topMesh.parent && !topMesh.userData?.partId && topMesh.parent !== rootGroup) {
-              topMesh = topMesh.parent;
-            }
-            if (topMesh.userData?.partName) {
-              setHoveredPartName(topMesh.userData.partName);
-            }
-          } else {
-            setHoveredPartName(null);
-          }
-        }
-
         previousMousePosition = { x: clientX, y: clientY };
       };
 
@@ -226,7 +203,7 @@ export default function ModelViewer3D({
     buildArchetypeGeometry(infrastructure, selectedPartMaterials, isWireframe, groupRef.current, partMeshesRef);
   }, [selectedPartMaterials, isWireframe, infrastructure]);
 
-  // Center Stage Focus & Explode Animation Controller
+  // Center Stage Focus & Explode Controller
   useEffect(() => {
     const meshes = partMeshesRef.current;
     if (!meshes) return;
@@ -290,6 +267,7 @@ export default function ModelViewer3D({
     });
   }
 
+  // 6 UNIQUE ARCHITECTURAL 3D PROCEDURAL GEOMETRIES
   function buildArchetypeGeometry(infra, partConfig, wireframe, parentGroup, partMeshMap) {
     while (parentGroup.children.length > 0) {
       const obj = parentGroup.children[0];
@@ -391,7 +369,7 @@ export default function ModelViewer3D({
       // 1. FOUNDATION
       const fGroup = new THREE.Group();
       const fMat = getPartMat('villa_foundation', 0x7A7A78);
-      const fMesh = new THREE.Mesh(new THREE.BoxGeometry(10.5, 0.5, 7.5), fMat);
+      const fMesh = new THREE.Mesh(new THREE.BoxGeometry(11.0, 0.5, 8.0), fMat);
       fMesh.position.set(0, 0.25, 0);
       fGroup.add(fMesh);
       attachPart('villa_foundation', 'FOUNDATION SLAB', fGroup, { x: 0, y: -1.2, z: 0 }, { x: 0, y: -2.5, z: 0 });
@@ -399,8 +377,8 @@ export default function ModelViewer3D({
       // 2. SOUTH WALL
       const sGroup = new THREE.Group();
       const sMat = getPartMat('villa_south_wall', 0xA07855);
-      const sMesh = new THREE.Mesh(new THREE.BoxGeometry(9.0, 3.8, 0.8), sMat);
-      sMesh.position.set(0, 2.4, 3.0);
+      const sMesh = new THREE.Mesh(new THREE.BoxGeometry(9.4, 3.8, 0.8), sMat);
+      sMesh.position.set(0, 2.4, 3.2);
       sMesh.castShadow = true;
       sGroup.add(sMesh);
       attachPart('villa_south_wall', 'SOUTH WALL ENVELOPE', sGroup, { x: 0, y: 0.5, z: 3.2 }, { x: 0, y: 0, z: 4.5 });
@@ -408,8 +386,8 @@ export default function ModelViewer3D({
       // 3. NORTH WALL
       const nGroup = new THREE.Group();
       const nMat = getPartMat('villa_north_wall', 0xA07855);
-      const nMesh = new THREE.Mesh(new THREE.BoxGeometry(9.0, 3.8, 0.8), nMat);
-      nMesh.position.set(0, 2.4, -3.0);
+      const nMesh = new THREE.Mesh(new THREE.BoxGeometry(9.4, 3.8, 0.8), nMat);
+      nMesh.position.set(0, 2.4, -3.2);
       nMesh.castShadow = true;
       nGroup.add(nMesh);
       attachPart('villa_north_wall', 'NORTH SHIELD WALL', nGroup, { x: 0, y: 0.5, z: -3.2 }, { x: 0, y: 0, z: -4.5 });
@@ -417,10 +395,10 @@ export default function ModelViewer3D({
       // 4. SIDE WALLS
       const sideGroup = new THREE.Group();
       const sideMat = getPartMat('villa_side_walls', 0xA07855);
-      const eastMesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 3.8, 5.2), sideMat);
-      eastMesh.position.set(4.1, 2.4, 0);
-      const westMesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 3.8, 5.2), sideMat);
-      westMesh.position.set(-4.1, 2.4, 0);
+      const eastMesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 3.8, 5.6), sideMat);
+      eastMesh.position.set(4.3, 2.4, 0);
+      const westMesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 3.8, 5.6), sideMat);
+      westMesh.position.set(-4.3, 2.4, 0);
       sideGroup.add(eastMesh);
       sideGroup.add(westMesh);
       attachPart('villa_side_walls', 'EAST & WEST SIDE WALLS', sideGroup, { x: 3.0, y: 0.5, z: 0 }, { x: 4.5, y: 0, z: 0 });
@@ -428,7 +406,7 @@ export default function ModelViewer3D({
       // 5. ROOF SLAB
       const rGroup = new THREE.Group();
       const rMat = getPartMat('villa_roof_cantilever', 0xC9A066);
-      const rMesh = new THREE.Mesh(new THREE.BoxGeometry(11.8, 0.45, 9.0), rMat);
+      const rMesh = new THREE.Mesh(new THREE.BoxGeometry(12.4, 0.45, 9.4), rMat);
       rMesh.position.set(0, 4.5, 0);
       rMesh.castShadow = true;
       rGroup.add(rMesh);
@@ -437,36 +415,230 @@ export default function ModelViewer3D({
       // 6. WINDOW PORTAL
       const wGroup = new THREE.Group();
       const wMat = getPartMat('villa_window_portal', 0x68A5BA);
-      const wMesh = new THREE.Mesh(new THREE.BoxGeometry(4.0, 3.2, 0.2), wMat);
-      wMesh.position.set(0, 2.1, 3.45);
+      const wMesh = new THREE.Mesh(new THREE.BoxGeometry(4.5, 3.2, 0.2), wMat);
+      wMesh.position.set(0, 2.1, 3.65);
       wGroup.add(wMesh);
       attachPart('villa_window_portal', 'PATIO WINDOW PORTAL', wGroup, { x: 0, y: 0.8, z: 3.5 }, { x: 0, y: 0, z: 5.5 });
 
       // 7. UTILITIES
       const uGroup = new THREE.Group();
       const uMat = new THREE.MeshStandardMaterial({ color: 0x1a237e, metalness: 0.8, roughness: 0.2 });
-      const sPanels = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.1, 3.2), uMat);
+      const sPanels = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.1, 3.4), uMat);
       sPanels.position.set(0, 4.9, 0);
       sPanels.rotation.x = -0.15;
       uGroup.add(sPanels);
       attachPart('villa_utilities', 'SOLAR PERGOLA SUITE', uGroup, { x: 0, y: 3.2, z: 0 }, { x: 0, y: 6.0, z: 0 });
 
-    } else {
-      const parts = ARCHETYPE_PARTS[infra.id] || ARCHETYPE_PARTS.yzy_mono_dome;
-      parts.forEach((p, idx) => {
-        const pGroup = new THREE.Group();
-        const pMat = getPartMat(p.id, 0x888888);
-        const yPos = 1.2 + idx * 1.6;
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(7.0 - idx * 0.6, 1.4, 7.0 - idx * 0.6), pMat);
-        mesh.position.y = yPos;
-        mesh.castShadow = true;
-        pGroup.add(mesh);
-        attachPart(p.id, p.name, pGroup, { x: 0, y: 1.2, z: 1.5 }, { x: 0, y: idx * 1.8, z: 0 });
-      });
+    } else if (infra.id === 'modular_eco_apartments') {
+      // 3-STORY MODULAR COMMUNE BLOCK
+      // 1. BASE PODIUM
+      const baseGroup = new THREE.Group();
+      const baseMat = getPartMat('mod_pod_base', 0x777777);
+      const podium = new THREE.Mesh(new THREE.BoxGeometry(9.0, 0.8, 9.0), baseMat);
+      podium.position.y = 0.4;
+      baseGroup.add(podium);
+      attachPart('mod_pod_base', 'PODIUM SUBGRADE', baseGroup, { x: 0, y: -1.2, z: 0 }, { x: 0, y: -2.5, z: 0 });
+
+      // 2. TIER 1 MODULES
+      const t1Group = new THREE.Group();
+      const t1Mat = getPartMat('mod_tier1_modules', 0xA07855);
+      const m1A = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.2, 7.6), t1Mat);
+      m1A.position.set(-2.0, 1.9, 0);
+      const m1B = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.2, 7.6), t1Mat);
+      m1B.position.set(2.0, 1.9, 0);
+      t1Group.add(m1A);
+      t1Group.add(m1B);
+      attachPart('mod_tier1_modules', 'LEVEL 01 LIVING MODULES', t1Group, { x: -2.0, y: 0.5, z: 0 }, { x: -3.5, y: 0, z: 0 });
+
+      // 3. TIER 2 MODULES
+      const t2Group = new THREE.Group();
+      const t2Mat = getPartMat('mod_tier2_modules', 0xC9A066);
+      const m2 = new THREE.Mesh(new THREE.BoxGeometry(7.8, 2.2, 3.8), t2Mat);
+      m2.position.set(0, 4.1, 1.2);
+      t2Group.add(m2);
+      attachPart('mod_tier2_modules', 'LEVEL 02 LIVING MODULES', t2Group, { x: 2.0, y: 0.5, z: 0 }, { x: 3.5, y: 0, z: 0 });
+
+      // 4. TIER 3 PENTHOUSE MODULES
+      const t3Group = new THREE.Group();
+      const t3Mat = getPartMat('mod_tier3_modules', 0xC9A066);
+      const m3 = new THREE.Mesh(new THREE.BoxGeometry(4.8, 2.2, 4.8), t3Mat);
+      m3.position.set(0, 6.3, -0.6);
+      t3Group.add(m3);
+      attachPart('mod_tier3_modules', 'LEVEL 03 PENTHOUSE', t3Group, { x: 0, y: 1.8, z: -1.5 }, { x: 0, y: 3.0, z: -3.0 });
+
+      // 5. FACADE GLAZING
+      const gGroup = new THREE.Group();
+      const gMat = getPartMat('mod_facade_glazing', 0x68A5BA);
+      const gMesh = new THREE.Mesh(new THREE.BoxGeometry(7.2, 1.4, 0.2), gMat);
+      gMesh.position.set(0, 4.1, 3.15);
+      gGroup.add(gMesh);
+      attachPart('mod_facade_glazing', 'COURTYARD GLAZING', gGroup, { x: 0, y: 0.5, z: 3.0 }, { x: 0, y: 0, z: 4.8 });
+
+      // 6. ROOFTOP CANOPY
+      const cGroup = new THREE.Group();
+      const cMat = getPartMat('mod_roof_canopy', 0xC9A066);
+      const canopy = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.2, 5.6), cMat);
+      canopy.position.set(0, 7.6, -0.6);
+      cGroup.add(canopy);
+      attachPart('mod_roof_canopy', 'COMMUNAL ROOFTOP CANOPY', cGroup, { x: 0, y: 2.5, z: 0 }, { x: 0, y: 4.5, z: 0 });
+
+      // 7. UTILITIES
+      const uGroup = new THREE.Group();
+      const uMat = new THREE.MeshStandardMaterial({ color: 0x1a237e, metalness: 0.8 });
+      const uMesh = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.2, 2.0), uMat);
+      uMesh.position.set(-3.2, 0.8, -3.2);
+      uGroup.add(uMesh);
+      attachPart('mod_utilities', 'DISTRICT MICROGRID', uGroup, { x: -2.5, y: 0, z: -2.5 }, { x: -4.0, y: 0, z: -4.0 });
+
+    } else if (infra.id === 'donda_resilience_commons') {
+      // DONDA VILLAGE ECOSYSTEM (CENTRAL BIODOME + SATELLITE DOMES RING)
+      // 1. PLAZA BASE
+      const pGroup = new THREE.Group();
+      const pMat = getPartMat('donda_base_plaza', 0x777777);
+      const plaza = new THREE.Mesh(new THREE.CylinderGeometry(9.2, 9.6, 0.4, 32), pMat);
+      plaza.position.y = 0.2;
+      pGroup.add(plaza);
+      attachPart('donda_base_plaza', 'COMMUNAL PLAZA BASE', pGroup, { x: 0, y: -1.2, z: 0 }, { x: 0, y: -2.5, z: 0 });
+
+      // 2. CENTRAL BIODOME
+      const cbGroup = new THREE.Group();
+      const cbMat = getPartMat('donda_central_dome', 0xDDDDC0);
+      const centralDome = new THREE.Mesh(new THREE.SphereGeometry(3.6, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2), cbMat);
+      centralDome.position.y = 0.4;
+      cbGroup.add(centralDome);
+      attachPart('donda_central_dome', 'CENTRAL BIODOME', cbGroup, { x: 0, y: 2.2, z: 0 }, { x: 0, y: 3.5, z: 0 });
+
+      // 3. SATELLITE RESIDENTIAL DOMES (6 Pods Ring)
+      const podsGroup = new THREE.Group();
+      const podMat = getPartMat('donda_living_pods', 0xA07855);
+      for (let i = 0; i < 6; i++) {
+        const angle = (i * Math.PI) / 3;
+        const radius = 6.2;
+        const px = Math.cos(angle) * radius;
+        const pz = Math.sin(angle) * radius;
+        const pod = new THREE.Mesh(new THREE.SphereGeometry(1.5, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), podMat);
+        pod.position.set(px, 0.4, pz);
+        podsGroup.add(pod);
+      }
+      attachPart('donda_living_pods', 'SATELLITE DOMES (6 PODS)', podsGroup, { x: 0, y: 1.0, z: 2.5 }, { x: 0, y: 1.5, z: 3.5 });
+
+      // 4. PERGOLA RING
+      const rGroup = new THREE.Group();
+      const rMat = getPartMat('donda_pergola_ring', 0xC49A45);
+      const ringMesh = new THREE.Mesh(new THREE.TorusGeometry(6.2, 0.25, 8, 32), rMat);
+      ringMesh.rotation.x = Math.PI / 2;
+      ringMesh.position.y = 2.4;
+      rGroup.add(ringMesh);
+      attachPart('donda_pergola_ring', 'RAIN HARVESTING RING', rGroup, { x: 0, y: 2.8, z: 0 }, { x: 0, y: 4.5, z: 0 });
+
+      // 5. MICROGRID
+      const mGroup = new THREE.Group();
+      const mMat = new THREE.MeshStandardMaterial({ color: 0x1a237e, metalness: 0.8 });
+      const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 5.5, 8), mMat);
+      tower.position.set(0, 2.75, 0);
+      mGroup.add(tower);
+      attachPart('donda_microgrid', 'CITY MICRO-GRID', mGroup, { x: 0, y: 3.5, z: 0 }, { x: 0, y: 5.5, z: 0 });
+
+    } else if (infra.id === 'rapid_emergency_pod') {
+      // RAPID EMERGENCY ORIGAMI POD
+      // 1. BASE CHASSIS
+      const chGroup = new THREE.Group();
+      const chMat = getPartMat('pod_base_chassis', 0x2E4057);
+      const chassis = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.5, 4.8), chMat);
+      chassis.position.y = 0.25;
+      chGroup.add(chassis);
+      attachPart('pod_base_chassis', 'ELEVATED BASE PLINTH', chGroup, { x: 0, y: -1.0, z: 0 }, { x: 0, y: -2.0, z: 0 });
+
+      // 2. BIO WALLS
+      const wGroup = new THREE.Group();
+      const wMat = getPartMat('pod_bio_walls', 0x2E4057);
+      const cabin = new THREE.Mesh(new THREE.BoxGeometry(4.2, 2.8, 4.2), wMat);
+      cabin.position.y = 1.9;
+      wGroup.add(cabin);
+      attachPart('pod_bio_walls', 'FLATPACK BIO-WALLS', wGroup, { x: 0, y: 0.8, z: 1.8 }, { x: 0, y: 0, z: 3.5 });
+
+      // 3. ORIGAMI ROOF
+      const rfGroup = new THREE.Group();
+      const rfMat = getPartMat('pod_origami_roof', 0x8E8E89);
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(3.6, 2.0, 4), rfMat);
+      roof.position.set(0, 4.3, 0);
+      roof.rotation.y = Math.PI / 4;
+      rfGroup.add(roof);
+      attachPart('pod_origami_roof', 'ANGLED ORIGAMI ROOF', rfGroup, { x: 0, y: 2.2, z: 0 }, { x: 0, y: 4.0, z: 0 });
+
+      // 4. GLAZING PORTS
+      const glGroup = new THREE.Group();
+      const glMat = getPartMat('pod_glazing', 0x68A5BA);
+      const port = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.8, 0.2), glMat);
+      port.position.set(0, 2.2, 2.15);
+      glGroup.add(port);
+      attachPart('pod_glazing', 'LIGHT PORTS', glGroup, { x: 0, y: 0.5, z: 2.5 }, { x: 0, y: 0, z: 4.5 });
+
+      // 5. SOLAR KIT
+      const skGroup = new THREE.Group();
+      const skMat = new THREE.MeshStandardMaterial({ color: 0x1a237e, metalness: 0.8 });
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.08, 1.4), skMat);
+      panel.position.set(0, 4.4, 1.5);
+      panel.rotation.x = 0.5;
+      skGroup.add(panel);
+      attachPart('pod_utility_kit', '12V EMERGENCY SOLAR KIT', skGroup, { x: 0, y: 2.0, z: 2.0 }, { x: 0, y: 3.5, z: 3.5 });
+
+    } else if (infra.id === 'terrace_earth_apartments') {
+      // STEPPED EARTH ZIGGURAT TERRACE COMPLEX
+      // 1. ZIGGURAT BEDROCK BASE
+      const bGroup = new THREE.Group();
+      const bMat = getPartMat('terrace_foundation', 0x777777);
+      const base = new THREE.Mesh(new THREE.BoxGeometry(11.0, 0.6, 10.0), bMat);
+      base.position.y = 0.3;
+      bGroup.add(base);
+      attachPart('terrace_foundation', 'ZIGGURAT BASE PLINTH', bGroup, { x: 0, y: -1.2, z: 0 }, { x: 0, y: -2.5, z: 0 });
+
+      // 2. STEPPED RESIDENTIAL WALL MATRIX
+      const wGroup = new THREE.Group();
+      const wMat = getPartMat('terrace_tier_walls', 0x8B9574);
+      const tier1 = new THREE.Mesh(new THREE.BoxGeometry(9.6, 2.2, 8.4), wMat);
+      tier1.position.set(0, 1.7, 0);
+      wGroup.add(tier1);
+      const tier2 = new THREE.Mesh(new THREE.BoxGeometry(7.4, 2.0, 6.4), wMat);
+      tier2.position.set(0, 3.8, -1.0);
+      wGroup.add(tier2);
+      const tier3 = new THREE.Mesh(new THREE.BoxGeometry(5.0, 1.8, 4.4), wMat);
+      tier3.position.set(0, 5.7, -2.0);
+      wGroup.add(tier3);
+      attachPart('terrace_tier_walls', 'STEPPED WALL MATRIX', wGroup, { x: 0, y: 0.8, z: 2.5 }, { x: 0, y: 0, z: 4.5 });
+
+      // 3. CASCADING GREEN ROOF TERRACES
+      const gGroup = new THREE.Group();
+      const gMat = getPartMat('terrace_garden_roofs', 0xC9A066);
+      const deck1 = new THREE.Mesh(new THREE.BoxGeometry(9.8, 0.25, 2.4), gMat);
+      deck1.position.set(0, 2.85, 3.0);
+      gGroup.add(deck1);
+      const deck2 = new THREE.Mesh(new THREE.BoxGeometry(7.6, 0.25, 2.2), gMat);
+      deck2.position.set(0, 4.85, 1.2);
+      gGroup.add(deck2);
+      attachPart('terrace_garden_roofs', 'CASCADING GARDEN DECKS', gGroup, { x: 0, y: 2.2, z: 0 }, { x: 0, y: 4.0, z: 0 });
+
+      // 4. PANORAMIC TERRACE GLAZING PORTALS
+      const pzGroup = new THREE.Group();
+      const pzMat = getPartMat('terrace_panoramic_windows', 0x68A5BA);
+      const win1 = new THREE.Mesh(new THREE.BoxGeometry(8.0, 1.4, 0.2), pzMat);
+      win1.position.set(0, 1.7, 4.25);
+      pzGroup.add(win1);
+      const win2 = new THREE.Mesh(new THREE.BoxGeometry(6.2, 1.4, 0.2), pzMat);
+      win2.position.set(0, 3.8, 2.25);
+      pzGroup.add(win2);
+      attachPart('terrace_panoramic_windows', 'TERRACE GLAZING PORTALS', pzGroup, { x: 0, y: 0.5, z: 3.5 }, { x: 0, y: 0, z: 5.5 });
+
+      // 5. CENTRALIZED ECO-GRID
+      const egGroup = new THREE.Group();
+      const egMat = new THREE.MeshStandardMaterial({ color: 0x1a237e, metalness: 0.8 });
+      const solarCanopy = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.15, 3.8), egMat);
+      solarCanopy.position.set(0, 6.7, -2.0);
+      egGroup.add(solarCanopy);
+      attachPart('terrace_utilities', 'URBAN ECO-GRID', egGroup, { x: 0, y: 3.0, z: 0 }, { x: 0, y: 5.0, z: 0 });
     }
   }
 
-  // Resize on isCompact change
   useEffect(() => {
     if (!containerRef.current || !rendererRef.current || !cameraRef.current) return;
     const newWidth = containerRef.current.clientWidth;
@@ -482,7 +654,7 @@ export default function ModelViewer3D({
         <AlertCircle className="w-8 h-8 text-yzy-warning mb-2" />
         <span className="font-bold text-white text-sm uppercase">2D ARCHITECTURAL MODE ACTIVE</span>
         <span className="text-xs text-yzy-ash max-w-sm mt-1">
-          WebGL acceleration disabled. You can continue customizing components and materials in the matrix below.
+          Select materials in the matrix below to customize the build.
         </span>
       </div>
     );
@@ -493,51 +665,44 @@ export default function ModelViewer3D({
       <div ref={containerRef} className="w-full h-full cursor-grab active:cursor-grabbing touch-none" />
 
       {/* Top Left: Active Part Indicator Badge */}
-      <div className="absolute top-3 left-3 flex flex-col gap-1 pointer-events-none">
-        <div className="flex items-center gap-2 bg-yzy-black/90 backdrop-blur-md px-3 py-1.5 border border-yzy-bone/40 shadow-lg">
+      <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 pointer-events-none z-10">
+        <div className="flex items-center gap-1.5 bg-yzy-black/90 backdrop-blur-md px-2.5 py-1 border border-yzy-bone/40 shadow-lg">
           <span className="w-2 h-2 rounded-full bg-yzy-neon animate-pulse" />
-          <span className="font-mono text-[10px] sm:text-xs tracking-widest text-white uppercase font-bold">
-            {activePartId ? `CENTER STAGE: ${activePartId.toUpperCase().replace(/_/g, ' ')}` : 'TAP ANY PART IN 3D TO PULL & INSPECT'}
+          <span className="font-mono text-[9px] sm:text-xs tracking-widest text-white uppercase font-bold truncate max-w-[200px] sm:max-w-none">
+            {activePartId ? activePartId.toUpperCase().replace(/_/g, ' ') : 'TAP 3D TO SELECT'}
           </span>
         </div>
-        {hoveredPartName && (
-          <span className="font-mono text-[9px] text-yzy-ash bg-yzy-black/80 px-2 py-0.5 border border-yzy-slate/60 w-fit">
-            HOVER: {hoveredPartName}
-          </span>
-        )}
       </div>
 
       {/* Top Right: Sun Azimuth Slider */}
-      <div className="absolute top-3 right-3 flex items-center gap-2 bg-yzy-black/85 backdrop-blur-md px-2.5 py-1.5 border border-yzy-slate text-[11px] font-mono">
-        <Sun className="w-3.5 h-3.5 text-yzy-warning" />
-        <span className="hidden sm:inline text-yzy-ash text-[10px]">SUN:</span>
+      <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 bg-yzy-black/85 backdrop-blur-md px-2 py-1 border border-yzy-slate text-[10px] font-mono z-10">
+        <Sun className="w-3 h-3 text-yzy-warning" />
         <input
           type="range"
           min="0"
           max="360"
           value={sunAngle}
           onChange={(e) => setSunAngle(Number(e.target.value))}
-          className="w-16 sm:w-20 h-1 bg-yzy-slate cursor-pointer accent-yzy-bone"
+          className="w-14 sm:w-20 h-1 bg-yzy-slate cursor-pointer accent-yzy-bone"
         />
-        <span className="text-yzy-chalk w-6 text-right text-[10px]">{sunAngle}°</span>
+        <span className="text-yzy-chalk w-5 text-right text-[9px]">{sunAngle}°</span>
       </div>
 
       {/* Bottom Floating Control Bar */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 sm:gap-2 bg-yzy-black/90 backdrop-blur-md px-3 py-2 border border-yzy-slate shadow-2xl z-10">
+      <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-yzy-black/90 backdrop-blur-md px-2 py-1.5 border border-yzy-slate shadow-2xl z-10">
         <button
           onClick={() => {
             playTactileClick();
             setIsIsolatedFocus(!isIsolatedFocus);
           }}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 font-mono text-[10px] sm:text-xs tracking-wider transition-all ${
+          className={`flex items-center gap-1 px-2 py-1 font-mono text-[9px] sm:text-xs tracking-wider transition-all ${
             isIsolatedFocus
               ? 'bg-yzy-bone text-yzy-black font-bold'
-              : 'text-yzy-chalk hover:text-white hover:bg-yzy-slate/60'
+              : 'text-yzy-chalk hover:text-white'
           }`}
-          title="Pull and isolate the selected part in the center of the screen"
         >
-          <Focus className="w-3.5 h-3.5" />
-          <span>{isIsolatedFocus ? 'CENTER STAGE' : 'FULL VIEW'}</span>
+          <Focus className="w-3 h-3" />
+          <span>{isIsolatedFocus ? 'FOCUS' : 'FULL'}</span>
         </button>
 
         <button
@@ -545,13 +710,13 @@ export default function ModelViewer3D({
             playTactileClick();
             setIsExploded(!isExploded);
           }}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 font-mono text-[10px] sm:text-xs tracking-wider transition-all ${
+          className={`flex items-center gap-1 px-2 py-1 font-mono text-[9px] sm:text-xs tracking-wider transition-all ${
             isExploded
               ? 'bg-yzy-neon text-yzy-black font-bold'
-              : 'text-yzy-chalk hover:text-white hover:bg-yzy-slate/60'
+              : 'text-yzy-chalk hover:text-white'
           }`}
         >
-          <Layers className="w-3.5 h-3.5" />
+          <Layers className="w-3 h-3" />
           <span>EXPLODE</span>
         </button>
 
@@ -560,7 +725,7 @@ export default function ModelViewer3D({
             playTactileClick();
             setIsWireframe(!isWireframe);
           }}
-          className={`px-2 py-1.5 font-mono text-[10px] transition-all ${
+          className={`px-2 py-1 font-mono text-[9px] sm:text-xs transition-all ${
             isWireframe ? 'text-yzy-neon font-bold bg-yzy-slate/60' : 'text-yzy-ash hover:text-white'
           }`}
         >
@@ -572,11 +737,11 @@ export default function ModelViewer3D({
             playTactileClick();
             setIsAutoRotate(!isAutoRotate);
           }}
-          className={`px-2 py-1.5 font-mono text-[10px] transition-all ${
+          className={`px-1.5 py-1 font-mono text-[9px] transition-all ${
             isAutoRotate ? 'text-white' : 'text-yzy-ash hover:text-white'
           }`}
         >
-          <RotateCcw className={`w-3.5 h-3.5 ${isAutoRotate ? 'animate-spin' : ''}`} style={{ animationDuration: '10s' }} />
+          <RotateCcw className={`w-3 h-3 ${isAutoRotate ? 'animate-spin' : ''}`} style={{ animationDuration: '10s' }} />
         </button>
       </div>
     </div>

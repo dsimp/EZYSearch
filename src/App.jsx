@@ -124,9 +124,9 @@ export default function App() {
       />
 
       {/* Main Content Viewport */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-24 flex flex-col gap-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-2.5 sm:px-6 py-2.5 sm:py-5 pb-24 flex flex-col gap-3 sm:gap-5">
         {activeTab === 'builder' && (
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-3 sm:gap-4">
             {/* Step 1: Archetype Selection */}
             <InfrastructureSelector
               infrastructures={INFRASTRUCTURES}
@@ -137,8 +137,8 @@ export default function App() {
             {/* Step 2: 3D Pick & Pull Interactive Canvas Viewport (Sticky on Scroll) */}
             <div className={`transition-all duration-300 ${
               isScrolled 
-                ? 'sticky top-[42px] z-30 shadow-2xl bg-yzy-black/95 backdrop-blur-md pt-1 pb-2 border-b border-yzy-bone/40 -mx-3 px-3 sm:-mx-6 sm:px-6' 
-                : 'relative flex flex-col gap-2'
+                ? 'sticky top-[42px] z-30 shadow-2xl bg-yzy-black/95 backdrop-blur-md pt-0.5 pb-1.5 border-b border-yzy-bone/40 -mx-2.5 px-2.5 sm:-mx-6 sm:px-6' 
+                : 'relative flex flex-col gap-1.5'
             }`}>
               <ModelViewer3D
                 infrastructure={selectedInfra}
