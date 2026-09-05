@@ -319,8 +319,10 @@ export default function StudioBuilderTab() {
             placedItems={placedItems}
             selectedInstanceId={selectedInstanceId}
             onSelectInstance={(id) => {
-              setSelectedInstanceId(id);
-              if (id) setActiveTab('inspector');
+              if (id) {
+                setSelectedInstanceId(id);
+                setActiveTab('inspector');
+              }
             }}
             onUpdateInstance={handleUpdateInstance}
             onDeleteInstance={handleDeleteInstance}

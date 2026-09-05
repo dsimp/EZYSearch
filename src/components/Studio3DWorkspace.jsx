@@ -191,13 +191,17 @@ export default function Studio3DWorkspace({
       const mouse = new THREE.Vector2();
 
       let isDragging = false;
+      let isPointerDownOnCanvas = false;
       let isHorizontalOrbit = false;
       let startPos = { x: 0, y: 0 };
       let previousPos = { x: 0, y: 0 };
       let totalDragDist = 0;
 
       const handlePointerDown = (e) => {
+        // Only initiate 3D drag if pointer started on the WebGL canvas
+        if (e.target !== domElement) return;
         isDragging = true;
+        isPointerDownOnCanvas = true;
         isHorizontalOrbit = false;
         totalDragDist = 0;
         const touch = e.touches && e.touches.length > 0 ? e.touches[0] : null;
@@ -210,7 +214,7 @@ export default function Studio3DWorkspace({
       };
 
       const handlePointerMove = (e) => {
-        if (!isDragging) return;
+        if (!isDragging || !isPointerDownOnCanvas) return;
         const touch = e.touches && e.touches.length > 0 ? e.touches[0] : null;
         const clientX = touch ? touch.clientX : e.clientX;
         const clientY = touch ? touch.clientY : e.clientY;
@@ -235,37 +239,43 @@ export default function Studio3DWorkspace({
       };
 
       const handlePointerUp = (e) => {
-        // Quick tap without dragging -> Raycast selection in 3D!
-        if (totalDragDist < 10 && renderer && renderer.domElement && rootGroupRef.current) {
+        // ONLY perform raycasting if the interaction explicitly started on this 3D canvas!
+        if (isPointerDownOnCanvas && totalDragDist < 8 && renderer && renderer.domElement && rootGroupRef.current) {
           const touch = e.changedTouches && e.changedTouches.length > 0 ? e.changedTouches[0] : null;
           const clientX = touch ? touch.clientX : e.clientX;
           const clientY = touch ? touch.clientY : e.clientY;
 
           if (clientX !== undefined && clientY !== undefined) {
             const rect = renderer.domElement.getBoundingClientRect();
-            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+            // Verify pointerup occurred directly inside the canvas bounds
+            if (
+              clientX >= rect.left &&
+              clientX <= rect.right &&
+              clientY >= rect.top &&
+              clientY <= rect.bottom
+            ) {
+              mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+              mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
 
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(rootGroupRef.current.children, true);
+              raycaster.setFromCamera(mouse, camera);
+              const intersects = raycaster.intersectObjects(rootGroupRef.current.children, true);
 
-            if (intersects.length > 0) {
-              let hitObj = intersects[0].object;
-              while (hitObj.parent && !hitObj.userData?.instanceId && hitObj.parent !== rootGroupRef.current) {
-                hitObj = hitObj.parent;
+              if (intersects.length > 0) {
+                let hitObj = intersects[0].object;
+                while (hitObj.parent && !hitObj.userData?.instanceId && hitObj.parent !== rootGroupRef.current) {
+                  hitObj = hitObj.parent;
+                }
+                if (hitObj.userData?.instanceId) {
+                  playSelectTone();
+                  onSelectInstance(hitObj.userData.instanceId);
+                }
               }
-              if (hitObj.userData?.instanceId) {
-                playSelectTone();
-                onSelectInstance(hitObj.userData.instanceId);
-              }
-            } else {
-              // Clicked empty ground -> deselect
-              onSelectInstance(null);
             }
           }
         }
         isDragging = false;
         isHorizontalOrbit = false;
+        isPointerDownOnCanvas = false;
       };
 
       const domElement = renderer.domElement;
@@ -738,7 +748,12 @@ export default function Studio3DWorkspace({
       <div ref={containerRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
 
       {/* Top Left Studio HUD Overlay */}
-      <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 pointer-events-none z-10">
+      <div 
+        onMouseDown={(e) => e.stopPropagation()} 
+        onTouchStart={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+        className="absolute top-2.5 left-2.5 flex flex-col gap-1 pointer-events-none z-10"
+      >
         <div className={`flex items-center gap-1.5 backdrop-blur-md px-2.5 py-1 border shadow-lg ${
           isWhiteTheme ? 'bg-white/90 border-neutral-300 text-neutral-900' : 'bg-yzy-black/90 border-yzy-bone/40 text-white'
         }`}>
@@ -753,7 +768,12 @@ export default function Studio3DWorkspace({
       </div>
 
       {/* Top Right Studio Viewport Settings */}
-      <div className="absolute top-2.5 right-2.5 flex items-center gap-1 z-10 font-mono text-[9px]">
+      <div 
+        onMouseDown={(e) => e.stopPropagation()} 
+        onTouchStart={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+        className="absolute top-2.5 right-2.5 flex items-center gap-1 z-10 font-mono text-[9px]"
+      >
         {/* Sun Azimuth */}
         <div className={`flex items-center gap-1 backdrop-blur-md px-2 py-1 border ${
           isWhiteTheme ? 'bg-white/90 border-neutral-300 text-neutral-800' : 'bg-yzy-black/85 border-yzy-slate text-yzy-bone'
@@ -790,9 +810,14 @@ export default function Studio3DWorkspace({
 
       {/* Floating Active Element Transform Gizmo (When a piece is selected) */}
       {activeInstance && (
-        <div className={`absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-wrap items-center justify-center gap-1 backdrop-blur-md px-2.5 py-1.5 border shadow-2xl z-20 font-mono text-[9px] sm:text-[10px] ${
-          isWhiteTheme ? 'bg-white/95 border-neutral-400 text-neutral-900' : 'bg-yzy-black/95 border-yzy-bone text-white'
-        }`}>
+        <div 
+          onMouseDown={(e) => e.stopPropagation()} 
+          onTouchStart={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          className={`absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-wrap items-center justify-center gap-1 backdrop-blur-md px-2.5 py-1.5 border shadow-2xl z-20 font-mono text-[9px] sm:text-[10px] ${
+            isWhiteTheme ? 'bg-white/95 border-neutral-400 text-neutral-900' : 'bg-yzy-black/95 border-yzy-bone text-white'
+          }`}
+        >
           <span className="font-bold text-yzy-neon mr-1 flex items-center gap-1">
             <Move className="w-3 h-3" /> SHIFT:
           </span>
@@ -862,9 +887,14 @@ export default function Studio3DWorkspace({
       )}
 
       {/* Bottom Control Bar */}
-      <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1 backdrop-blur-md px-2 py-1 border shadow-2xl z-10 font-mono text-[9px] sm:text-xs ${
-        isWhiteTheme ? 'bg-white/90 border-neutral-300 text-neutral-800' : 'bg-yzy-black/90 border-yzy-slate text-yzy-chalk'
-      }`}>
+      <div 
+        onMouseDown={(e) => e.stopPropagation()} 
+        onTouchStart={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+        className={`absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1 backdrop-blur-md px-2 py-1 border shadow-2xl z-10 font-mono text-[9px] sm:text-xs ${
+          isWhiteTheme ? 'bg-white/90 border-neutral-300 text-neutral-800' : 'bg-yzy-black/90 border-yzy-slate text-yzy-chalk'
+        }`}
+      >
         <button
           onClick={() => {
             playTactileClick();
