@@ -10,6 +10,7 @@ import MaterialLibrary from './components/MaterialLibrary';
 import FurnitureCatalog from './components/FurnitureCatalog';
 import TutorialWalkthrough from './components/TutorialWalkthrough';
 import SourcingMap from './components/SourcingMap';
+import StudioBuilderTab from './components/StudioBuilderTab';
 import CostBreakdownModal from './components/CostBreakdownModal';
 import ExportBlueprintModal from './components/ExportBlueprintModal';
 import DondaVisionModal from './components/DondaVisionModal';
@@ -22,9 +23,10 @@ import {
   Download, 
   Sparkles, 
   Cpu, 
-  ChevronRight,
-  ShieldCheck,
-  MousePointer
+  ChevronRight, 
+  ShieldCheck, 
+  MousePointer,
+  Box
 } from 'lucide-react';
 import { playTactileClick, playSelectTone, playConfirmTone } from './utils/audio';
 
@@ -125,6 +127,10 @@ export default function App() {
 
       {/* Main Content Viewport */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-2.5 sm:px-6 py-2.5 sm:py-5 pb-24 flex flex-col gap-3 sm:gap-5">
+        {activeTab === 'studio' && (
+          <StudioBuilderTab />
+        )}
+
         {activeTab === 'builder' && (
           <div className="flex flex-col gap-3 sm:gap-4">
             {/* Step 1: Archetype Selection */}
@@ -208,13 +214,26 @@ export default function App() {
       </main>
 
       {/* Mobile Bottom Quick-Dock */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-yzy-obsidian/95 backdrop-blur-md border-t border-yzy-slate/80 p-2 sm:hidden flex items-center justify-around font-mono text-[10px]">
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-yzy-obsidian/95 backdrop-blur-md border-t border-yzy-slate/80 p-1.5 sm:hidden flex items-center justify-around font-mono text-[9px]">
+        <button
+          onClick={() => {
+            playTactileClick();
+            setActiveTab('studio');
+          }}
+          className={`flex flex-col items-center gap-0.5 py-1 px-1 ${
+            activeTab === 'studio' ? 'text-white font-bold' : 'text-yzy-ash'
+          }`}
+        >
+          <Box className="w-4 h-4 text-yzy-neon" />
+          <span>STUDIO</span>
+        </button>
+
         <button
           onClick={() => {
             playTactileClick();
             setActiveTab('builder');
           }}
-          className={`flex flex-col items-center gap-1 py-1 px-1.5 ${
+          className={`flex flex-col items-center gap-0.5 py-1 px-1 ${
             activeTab === 'builder' ? 'text-white font-bold' : 'text-yzy-ash'
           }`}
         >
@@ -227,7 +246,7 @@ export default function App() {
             playTactileClick();
             setActiveTab('materials');
           }}
-          className={`flex flex-col items-center gap-1 py-1 px-1.5 ${
+          className={`flex flex-col items-center gap-0.5 py-1 px-1 ${
             activeTab === 'materials' ? 'text-white font-bold' : 'text-yzy-ash'
           }`}
         >
@@ -240,7 +259,7 @@ export default function App() {
             playTactileClick();
             setActiveTab('furniture');
           }}
-          className={`flex flex-col items-center gap-1 py-1 px-1.5 ${
+          className={`flex flex-col items-center gap-0.5 py-1 px-1 ${
             activeTab === 'furniture' ? 'text-white font-bold' : 'text-yzy-ash'
           }`}
         >
@@ -253,7 +272,7 @@ export default function App() {
             playTactileClick();
             setActiveTab('tutorials');
           }}
-          className={`flex flex-col items-center gap-1 py-1 px-1.5 ${
+          className={`flex flex-col items-center gap-0.5 py-1 px-1 ${
             activeTab === 'tutorials' ? 'text-white font-bold' : 'text-yzy-ash'
           }`}
         >
@@ -266,7 +285,7 @@ export default function App() {
             playConfirmTone();
             setIsCostModalOpen(true);
           }}
-          className="flex flex-col items-center gap-1 py-1 px-1.5 text-yzy-neon font-bold"
+          className="flex flex-col items-center gap-0.5 py-1 px-1 text-yzy-neon font-bold"
         >
           <DollarSign className="w-4 h-4" />
           <span>${totalCost.toLocaleString()}</span>

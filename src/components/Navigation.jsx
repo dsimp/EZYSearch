@@ -13,7 +13,8 @@ import {
   Sparkles,
   Download,
   Share2,
-  Cpu
+  Cpu,
+  Box
 } from 'lucide-react';
 import { playTactileClick, playConfirmTone, toggleAudio, isAudioEnabled } from '../utils/audio';
 
@@ -36,7 +37,8 @@ export default function Navigation({
   };
 
   const navItems = [
-    { id: 'builder', label: '01 // CONFIGURATOR', icon: Building2 },
+    { id: 'studio', label: '00 // 3D STUDIO BUILDER', icon: Box },
+    { id: 'builder', label: '01 // ARCHETYPES MATRIX', icon: Building2 },
     { id: 'materials', label: '02 // MATERIALS INDEX', icon: Layers },
     { id: 'furniture', label: '03 // ECO FURNITURE', icon: Cpu },
     { id: 'tutorials', label: '04 // NOVICE BUILD GUIDE', icon: BookOpen },
